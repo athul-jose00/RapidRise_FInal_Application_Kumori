@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                   String     @id @default(cuid())
+  firstName            String
+  lastName             String
+  email                String     @unique
+  password             String
+  dateOfBirth          DateTime
+  passwordResetToken   String?    @db.VarChar(64)
+  passwordResetExpires DateTime?
+  sessions             Session[]
+  files                File[]
+  shares               FileShare[] @relation("ownerShares")
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+}
+
+model File {
+  id               String    @id @default(cuid())
+  userId           String
+  originalFileName String
+  storedFileName   String
+  cloudinaryPublicId String   @unique
+  cloudinaryResourceType String
+  cloudinaryUrl    String
+  fileSize         BigInt
+  mimeType         String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  owner            User      @relation(fields: [userId], references: [id])
+  shares           FileShare[]
+}
+
+model FileShare {
+  id             String   @id @default(cuid())
+  fileId         String
+  ownerId        String
+  recipientEmail String
+  token          String   @unique
+  message        String?
+  expiresAt      DateTime
+  openedAt       DateTime?
+  createdAt      DateTime @default(now())
+  file           File     @relation(fields: [fileId], references: [id])
+  owner          User     @relation("ownerShares", fields: [ownerId], references: [id])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean  @default(true)
+  expiresAt    DateTime
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+}
