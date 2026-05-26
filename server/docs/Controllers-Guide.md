@@ -4,7 +4,7 @@ This guide explains the controllers used in the server project, what each one do
 
 ## High-Level Architecture
 
-The server is organized around three controller areas:
+The server is organized around three controller areas:6
 
 1. Authentication and account management
 2. File storage, download, and deletion

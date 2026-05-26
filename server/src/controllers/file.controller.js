@@ -5,6 +5,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { extractFileContent } from "../utils/content-extractor.js";
+import { embedFileSemanticContent } from "../utils/semantic-indexer.js";
 
 const MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024; // 1 GB
 
@@ -106,9 +107,11 @@ const uploadFiles = async (req, res) => {
 
       let contentIndexed = false;
       let extractionError = null;
+      let semanticIndexed = false;
+      let semanticIndexError = null;
+      const extracted = await extractFileContent(f.buffer, f.mimetype);
 
       try {
-        const extracted = await extractFileContent(f.buffer, f.mimetype);
         const extractedContent = extracted?.content || "";
         const searchIndex = extractedContent.trim().toLowerCase();
         const hasExtractableText = extractedContent.trim().length > 0;
@@ -142,6 +145,50 @@ const uploadFiles = async (req, res) => {
         });
       }
 
+      try {
+        const semanticResult = await embedFileSemanticContent({
+          buffer: f.buffer,
+          mimeType: f.mimetype,
+          extractedContent: extracted?.content || "",
+          originalFileName: record.originalFileName,
+        });
+
+        if (semanticResult?.embedding) {
+          await prisma.fileEmbedding.upsert({
+            where: { fileId: record.id },
+            create: {
+              fileId: record.id,
+              model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+              inputType: semanticResult.inputType,
+              embeddingKind: semanticResult.embeddingKind,
+              dimensions: Array.isArray(semanticResult.embedding)
+                ? semanticResult.embedding.length
+                : null,
+              vector: semanticResult.embedding,
+            },
+            update: {
+              model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+              inputType: semanticResult.inputType,
+              embeddingKind: semanticResult.embeddingKind,
+              dimensions: Array.isArray(semanticResult.embedding)
+                ? semanticResult.embedding.length
+                : null,
+              vector: semanticResult.embedding,
+            },
+          });
+
+          semanticIndexed = true;
+        }
+      } catch (error) {
+        semanticIndexError = error;
+        console.error("Semantic embedding failed", {
+          fileId: record.id,
+          fileName: record.originalFileName,
+          mimeType: record.mimeType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       created.push({
         id: record.id,
         originalFileName: record.originalFileName,
@@ -150,10 +197,16 @@ const uploadFiles = async (req, res) => {
         createdAt: record.createdAt,
         downloadUrl: `/api/files/${record.id}/download`,
         contentIndexed,
+        semanticIndexed,
         contentIndexError: extractionError
           ? extractionError instanceof Error
             ? extractionError.message
             : String(extractionError)
+          : null,
+        semanticIndexError: semanticIndexError
+          ? semanticIndexError instanceof Error
+            ? semanticIndexError.message
+            : String(semanticIndexError)
           : null,
       });
     }
@@ -162,6 +215,7 @@ const uploadFiles = async (req, res) => {
       message: "Files uploaded",
       files: created,
       contentIndexed: created.some((file) => file.contentIndexed),
+      semanticIndexed: created.some((file) => file.semanticIndexed),
     });
   } catch (err) {
     console.error(err);
@@ -242,6 +296,11 @@ const deleteFile = async (req, res) => {
       await prisma.fileContent.deleteMany({ where: { fileId: id } });
     } catch (e) {
       console.error("Failed to delete related FileContent records", e);
+    }
+    try {
+      await prisma.fileEmbedding.deleteMany({ where: { fileId: id } });
+    } catch (e) {
+      console.error("Failed to delete related FileEmbedding records", e);
     }
 
     await prisma.file.delete({ where: { id } });

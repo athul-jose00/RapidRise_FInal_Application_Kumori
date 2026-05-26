@@ -197,6 +197,7 @@ shareToken =
 
 - `201 Created`
 - Uploaded file metadata in response
+- `semanticIndexed: true` when an embedding is successfully stored
 
 **Suggested test file:**
 
@@ -256,7 +257,7 @@ shareToken =
 
 ### 10) Search Files
 
-This endpoint now matches against both the file name and the extracted file content.
+This endpoint now matches against the file name, extracted file content, and semantic embeddings.
 
 **Method:** `GET`
 **URL:** `{{baseUrl}}/api/search?q=invoice&page=1&limit=20`
@@ -268,15 +269,16 @@ This endpoint now matches against both the file name and the extracted file cont
 **Expected:**
 
 - `200 OK`
-- Files whose name matches the query, files whose content matches the query, or files that match both
-- Each result includes `matchCount` and `matches`
-- `matches` entries may have `type: "fileName"` or `type: "content"`
+- Files whose name matches the query, files whose content matches the query, files that match semantically, or files that match multiple ways
+- Each result includes `matchCount`, `matches`, `matchedBy`, `relevanceScore`, and `semanticScore`
+- `matches` entries may have `type: "fileName"`, `type: "content"`, or `type: "semantic"`
 
 **Example queries:**
 
 - Search by file name: `q=report`
 - Search by extracted content: `q=invoice`
 - Search by both: `q=pdf`
+- Search an image semantically: upload a beach photo, then search `q=beach`
 
 ---
 
@@ -292,8 +294,9 @@ This endpoint now matches against both the file name and the extracted file cont
 **Expected:**
 
 - `200 OK`
-- Returns the file metadata plus matching snippets
-- `matches` may include a file-name match and/or content matches
+- Returns the file metadata plus matching snippets and semantic relevance
+- `matches` may include a file-name match, content matches, and/or a semantic match entry
+- `semanticScore` shows the embedding similarity when available
 
 ## Sharing APIs
 

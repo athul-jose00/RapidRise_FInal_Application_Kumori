@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon --watch src --exec node src/server.js"
+    "dev": "nodemon --watch src --exec node src/server.js",
+    "backfill:embeddings": "node scripts/backfill-semantic-embeddings.js"
   },
   "dependencies": {
     "@prisma/adapter-neon": "^7.8.0",

@@ -37,6 +37,7 @@ model File {
   owner            User      @relation(fields: [userId], references: [id])
   shares           FileShare[]
   fileContent      FileContent?
+  fileEmbedding    FileEmbedding?
 }
 
 model FileContent {
@@ -53,6 +54,22 @@ model FileContent {
   updatedAt     DateTime @updatedAt
 
   file          File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+}
+
+model FileEmbedding {
+  id             String   @id @default(cuid())
+  fileId         String   @unique
+  model          String
+  inputType      String
+  embeddingKind  String
+  dimensions     Int?
+  vector         Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  file           File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@index([fileId])
 }
