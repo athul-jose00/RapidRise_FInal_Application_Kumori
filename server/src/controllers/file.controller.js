@@ -4,6 +4,7 @@ import crypto from "crypto";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { extractFileContent } from "../utils/content-extractor.js";
 
 const MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024; // 1 GB
 
@@ -102,6 +103,45 @@ const uploadFiles = async (req, res) => {
           mimeType: f.mimetype,
         },
       });
+
+      let contentIndexed = false;
+      let extractionError = null;
+
+      try {
+        const extracted = await extractFileContent(f.buffer, f.mimetype);
+        const extractedContent = extracted?.content || "";
+        const searchIndex = extractedContent.trim().toLowerCase();
+        const hasExtractableText = extractedContent.trim().length > 0;
+
+        if (hasExtractableText) {
+          await prisma.fileContent.create({
+            data: {
+              fileId: record.id,
+              content: extractedContent,
+              searchIndex,
+              wordCount: extracted?.metadata?.wordCount ?? null,
+              pageCount: extracted?.metadata?.pageCount ?? null,
+              ocrConfidence: extracted?.metadata?.ocrConfidence ?? null,
+              language: extracted?.metadata?.language ?? null,
+            },
+          });
+        } else {
+          extractionError = new Error(
+            "No extractable text found for this file",
+          );
+        }
+
+        contentIndexed = hasExtractableText;
+      } catch (error) {
+        extractionError = error;
+        console.error("Content extraction failed", {
+          fileId: record.id,
+          fileName: record.originalFileName,
+          mimeType: record.mimeType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       created.push({
         id: record.id,
         originalFileName: record.originalFileName,
@@ -109,10 +149,20 @@ const uploadFiles = async (req, res) => {
         mimeType: record.mimeType,
         createdAt: record.createdAt,
         downloadUrl: `/api/files/${record.id}/download`,
+        contentIndexed,
+        contentIndexError: extractionError
+          ? extractionError instanceof Error
+            ? extractionError.message
+            : String(extractionError)
+          : null,
       });
     }
 
-    res.status(201).json({ message: "Files uploaded", files: created });
+    res.status(201).json({
+      message: "Files uploaded",
+      files: created,
+      contentIndexed: created.some((file) => file.contentIndexed),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Upload error" });
@@ -182,6 +232,18 @@ const deleteFile = async (req, res) => {
         console.error("cloudinary delete error", e);
       }
     }
+    // remove dependent records first to avoid FK constraint errors
+    try {
+      await prisma.fileShare.deleteMany({ where: { fileId: id } });
+    } catch (e) {
+      console.error("Failed to delete related FileShare records", e);
+    }
+    try {
+      await prisma.fileContent.deleteMany({ where: { fileId: id } });
+    } catch (e) {
+      console.error("Failed to delete related FileContent records", e);
+    }
+
     await prisma.file.delete({ where: { id } });
     res.json({ message: "File deleted" });
   } catch (err) {

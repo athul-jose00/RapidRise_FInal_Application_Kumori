@@ -36,6 +36,25 @@ model File {
   updatedAt        DateTime  @updatedAt
   owner            User      @relation(fields: [userId], references: [id])
   shares           FileShare[]
+  fileContent      FileContent?
+}
+
+model FileContent {
+  id            String   @id @default(cuid())
+  fileId        String   @unique
+  content       String   @db.Text
+  searchIndex   String?  @db.Text
+  wordCount     Int?
+  pageCount     Int?
+  ocrConfidence Float?
+  language      String?
+  extractedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  file          File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
 }
 
 model FileShare {

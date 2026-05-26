@@ -252,9 +252,52 @@ shareToken =
 - `200 OK`
 - File removed from database and Cloudinary
 
+## Search APIs
+
+### 10) Search Files
+
+This endpoint now matches against both the file name and the extracted file content.
+
+**Method:** `GET`
+**URL:** `{{baseUrl}}/api/search?q=invoice&page=1&limit=20`
+
+**Headers:**
+
+- `Authorization: Bearer {{token}}`
+
+**Expected:**
+
+- `200 OK`
+- Files whose name matches the query, files whose content matches the query, or files that match both
+- Each result includes `matchCount` and `matches`
+- `matches` entries may have `type: "fileName"` or `type: "content"`
+
+**Example queries:**
+
+- Search by file name: `q=report`
+- Search by extracted content: `q=invoice`
+- Search by both: `q=pdf`
+
+---
+
+### 11) Search Inside a File
+
+**Method:** `GET`
+**URL:** `{{baseUrl}}/api/files/{{fileId}}/search?q=invoice`
+
+**Headers:**
+
+- `Authorization: Bearer {{token}}`
+
+**Expected:**
+
+- `200 OK`
+- Returns the file metadata plus matching snippets
+- `matches` may include a file-name match and/or content matches
+
 ## Sharing APIs
 
-### 10) Create Share
+### 12) Create Share
 
 **Method:** `POST`
 **URL:** `{{baseUrl}}/api/shares`
@@ -305,7 +348,7 @@ or a comma-separated string:
 
 ---
 
-### 11) List Shares
+### 13) List Shares
 
 **Method:** `GET`
 **URL:** `{{baseUrl}}/api/shares`

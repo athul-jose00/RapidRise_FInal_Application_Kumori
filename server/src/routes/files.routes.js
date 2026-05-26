@@ -7,12 +7,14 @@ import {
   downloadFile,
   deleteFile,
 } from "../controllers/file.controller.js";
+import { searchFileContent } from "../controllers/search.controller.js";
 
 const router = express.Router();
 
 // multiple files under 'files' field
-router.post("/upload", authenticate, upload.array("file", 20), uploadFiles);
+router.post("/upload", authenticate, upload.array("files", 20), uploadFiles);
 router.get("/", authenticate, listFiles);
+router.get("/:fileId/search", authenticate, searchFileContent);
 router.get("/:id/download", authenticate, downloadFile);
 router.delete("/:id", authenticate, deleteFile);
 

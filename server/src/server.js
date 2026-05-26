@@ -8,6 +8,7 @@ import prisma from "./config/prisma.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import filesRoutes from "./routes/files.routes.js";
+import searchRoutes from "./routes/search.routes.js";
 import sharesRoutes from "./routes/shares.routes.js";
 import publicRoutes from "./routes/public.routes.js";
 import errorHandler from "./middleware/error.middleware.js";
@@ -39,6 +40,7 @@ app.get("/", (req, res) => res.send("RapidRise File Sharing API"));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/files", filesRoutes);
+app.use("/api/search", searchRoutes);
 app.use("/api/shares", sharesRoutes);
 app.use("/public", publicRoutes);
 
