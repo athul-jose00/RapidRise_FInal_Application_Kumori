@@ -64,6 +64,8 @@ model FileEmbedding {
   model          String
   inputType      String
   embeddingKind  String
+  caption        String?  @db.Text
+  labels         Json?
   dimensions     Int?
   vector         Json
   createdAt      DateTime @default(now())

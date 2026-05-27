@@ -49,13 +49,31 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
+// process-level handlers to log unhandled errors for easier debugging
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err && err.stack ? err.stack : err);
+  // allow process to exit so nodemon can restart with fresh state
+  process.exit(1);
+});
+
 const start = async () => {
   try {
     await prisma.$connect();
     console.log("Prisma connected");
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    server.on("error", (err) => {
+      console.error("Server listen error:", err && err.stack ? err.stack : err);
+      if (err && err.code === "EADDRINUSE") {
+        console.error(`Port ${PORT} is already in use`);
+      }
+      process.exit(1);
+    });
   } catch (err) {
-    console.error("Prisma connect error:", err);
+    console.error("Prisma connect error:", err && err.stack ? err.stack : err);
     process.exit(1);
   }
 };

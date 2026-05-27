@@ -36,7 +36,9 @@ const backfillSemanticEmbeddings = async () => {
 
   for (const file of files) {
     try {
-      const isImage = typeof file.mimeType === "string" && file.mimeType.toLowerCase().startsWith("image/");
+      const isImage =
+        typeof file.mimeType === "string" &&
+        file.mimeType.toLowerCase().startsWith("image/");
       const extractedContent = file.fileContent?.content || "";
 
       let buffer = null;
@@ -83,11 +85,16 @@ const backfillSemanticEmbeddings = async () => {
       console.log(`Indexed file ${file.id} (${file.originalFileName})`);
     } catch (error) {
       failed += 1;
-      console.error(`Failed to index ${file.id} (${file.originalFileName})`, error);
+      console.error(
+        `Failed to index ${file.id} (${file.originalFileName})`,
+        error,
+      );
     }
   }
 
-  console.log(`Backfill complete. created=${created} skipped=${skipped} failed=${failed}`);
+  console.log(
+    `Backfill complete. created=${created} skipped=${skipped} failed=${failed}`,
+  );
 };
 
 try {

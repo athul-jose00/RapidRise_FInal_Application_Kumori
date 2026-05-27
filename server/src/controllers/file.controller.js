@@ -109,6 +109,8 @@ const uploadFiles = async (req, res) => {
       let extractionError = null;
       let semanticIndexed = false;
       let semanticIndexError = null;
+      let semanticCaption = null;
+      let semanticLabels = [];
       const extracted = await extractFileContent(f.buffer, f.mimetype);
 
       try {
@@ -154,6 +156,11 @@ const uploadFiles = async (req, res) => {
         });
 
         if (semanticResult?.embedding) {
+          semanticCaption = semanticResult.caption || null;
+          semanticLabels = Array.isArray(semanticResult.labels)
+            ? semanticResult.labels
+            : [];
+
           await prisma.fileEmbedding.upsert({
             where: { fileId: record.id },
             create: {
@@ -161,6 +168,8 @@ const uploadFiles = async (req, res) => {
               model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
               inputType: semanticResult.inputType,
               embeddingKind: semanticResult.embeddingKind,
+              caption: semanticCaption,
+              labels: semanticLabels,
               dimensions: Array.isArray(semanticResult.embedding)
                 ? semanticResult.embedding.length
                 : null,
@@ -170,6 +179,8 @@ const uploadFiles = async (req, res) => {
               model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
               inputType: semanticResult.inputType,
               embeddingKind: semanticResult.embeddingKind,
+              caption: semanticCaption,
+              labels: semanticLabels,
               dimensions: Array.isArray(semanticResult.embedding)
                 ? semanticResult.embedding.length
                 : null,
@@ -198,6 +209,8 @@ const uploadFiles = async (req, res) => {
         downloadUrl: `/api/files/${record.id}/download`,
         contentIndexed,
         semanticIndexed,
+        caption: semanticCaption,
+        labels: semanticLabels,
         contentIndexError: extractionError
           ? extractionError instanceof Error
             ? extractionError.message

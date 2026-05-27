@@ -154,11 +154,47 @@ const getKeywordMatches = (file, query) => {
     });
   }
 
-  const content = file.fileContent?.content || file.fileContent?.searchIndex || "";
+  const content =
+    file.fileContent?.content || file.fileContent?.searchIndex || "";
   const contentMatches = searchContent(content, query).map((match) => ({
     type: "content",
     ...match,
   }));
+
+  const caption = file.fileEmbedding?.caption || "";
+  if (
+    typeof caption === "string" &&
+    caption.toLowerCase().includes(normalizedQuery)
+  ) {
+    const matchIndex = caption.toLowerCase().indexOf(normalizedQuery);
+    matches.push({
+      type: "caption",
+      match: caption,
+      position: matchIndex,
+      context: caption,
+      matchStart: matchIndex,
+      matchEnd: matchIndex + normalizedQuery.length,
+    });
+  }
+
+  const labels = Array.isArray(file.fileEmbedding?.labels)
+    ? file.fileEmbedding.labels
+    : [];
+  for (const label of labels) {
+    const labelText = String(label);
+    const normalizedLabel = labelText.toLowerCase();
+    if (normalizedLabel.includes(normalizedQuery)) {
+      const matchIndex = normalizedLabel.indexOf(normalizedQuery);
+      matches.push({
+        type: "label",
+        match: labelText,
+        position: matchIndex,
+        context: labelText,
+        matchStart: matchIndex,
+        matchEnd: matchIndex + normalizedQuery.length,
+      });
+    }
+  }
 
   matches.push(...contentMatches);
 
@@ -223,7 +259,10 @@ const buildFileSearchPayload = ({
     queryEmbedding,
     keywordMatches.length > 0,
   );
-  const matches = [...keywordMatches, ...(semanticMatch ? [semanticMatch] : [])];
+  const matches = [
+    ...keywordMatches,
+    ...(semanticMatch ? [semanticMatch] : []),
+  ];
 
   if (matches.length === 0) {
     return null;
@@ -244,6 +283,10 @@ const buildFileSearchPayload = ({
     fileSize: Number(file.fileSize),
     createdAt: file.createdAt,
     updatedAt: file.updatedAt,
+    caption: file.fileEmbedding?.caption || null,
+    labels: Array.isArray(file.fileEmbedding?.labels)
+      ? file.fileEmbedding.labels
+      : [],
     semanticScore: semanticMatch?.score || null,
     relevanceScore,
     matchedBy: matches.map((match) => match.type),
@@ -282,7 +325,12 @@ const getSearchResults = async ({
     });
   }
 
-  const keywordWhere = buildKeywordWhere(userId, normalizedQuery, tokens, filters);
+  const keywordWhere = buildKeywordWhere(
+    userId,
+    normalizedQuery,
+    tokens,
+    filters,
+  );
 
   let files = await prisma.file.findMany({
     where: keywordWhere,
@@ -303,6 +351,8 @@ const getSearchResults = async ({
           model: true,
           inputType: true,
           embeddingKind: true,
+          caption: true,
+          labels: true,
           dimensions: true,
           vector: true,
         },
@@ -330,6 +380,8 @@ const getSearchResults = async ({
             model: true,
             inputType: true,
             embeddingKind: true,
+            caption: true,
+            labels: true,
             dimensions: true,
             vector: true,
           },
@@ -357,7 +409,9 @@ const getSearchResults = async ({
         return right.matchCount - left.matchCount;
       }
 
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      return (
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      );
     });
 
   return {
@@ -416,6 +470,8 @@ const searchFileContent = async (req, res) => {
             model: true,
             inputType: true,
             embeddingKind: true,
+            caption: true,
+            labels: true,
             dimensions: true,
             vector: true,
           },
