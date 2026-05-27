@@ -9,6 +9,7 @@
     "backfill:embeddings": "node scripts/backfill-semantic-embeddings.js"
   },
   "dependencies": {
+    "@huggingface/inference": "^4.13.18",
     "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcrypt": "^5.1.0",

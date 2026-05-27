@@ -1,4 +1,5 @@
 import https from "node:https";
+import { InferenceClient } from "@huggingface/inference";
 
 const COHERE_API_KEY = process.env.COHERE_API_KEY || "";
 const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL || "embed-v4.0";
@@ -8,6 +9,9 @@ const COHERE_EMBED_DIMENSION = Number.parseInt(
 );
 const COHERE_BASE_URL =
   process.env.COHERE_BASE_URL || "https://api.cohere.com/v1/embed";
+const HF_TOKEN = process.env.HF_TOKEN || "";
+const HF_IMAGE_MODEL =
+  process.env.HF_IMAGE_MODEL || "CohereLabs/command-a-vision-07-2025:cohere";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_FALLBACK_MODELS = (
@@ -20,6 +24,10 @@ const GEMINI_BASE_URL =
   process.env.GEMINI_BASE_URL ||
   "https://generativelanguage.googleapis.com/v1beta/models";
 const COHERE_IMAGE_SIZE_LIMIT = 5 * 1024 * 1024;
+const HF_IMAGE_SIZE_LIMIT = Number.parseInt(
+  process.env.HF_IMAGE_SIZE_LIMIT || String(10 * 1024 * 1024),
+  10,
+);
 const GEMINI_IMAGE_SIZE_LIMIT = Number.parseInt(
   process.env.GEMINI_IMAGE_SIZE_LIMIT || String(10 * 1024 * 1024),
   10,
@@ -32,6 +40,7 @@ const QUERY_EMBED_CACHE_TTL_MS = Number.parseInt(
   10,
 );
 const queryEmbeddingCache = new Map();
+const hfClient = HF_TOKEN ? new InferenceClient(HF_TOKEN) : null;
 
 const isImageMimeType = (mimeType) =>
   typeof mimeType === "string" && mimeType.toLowerCase().startsWith("image/");
@@ -168,6 +177,12 @@ const postJsonWithApiKey = (url, apiKey, payload) =>
 const buildGeminiUrl = (modelName) =>
   `${GEMINI_BASE_URL}/${modelName}:generateContent`;
 
+const extractGeminiText = (responseBody) =>
+  responseBody?.candidates?.[0]?.content?.parts
+    ?.map((part) => part?.text || "")
+    .join("")
+    .trim() || "";
+
 const isRetryableGeminiError = (error) => {
   const message = error instanceof Error ? error.message : String(error);
   return /high demand|quota|rate limit|resource exhausted|temporarily unavailable|service unavailable|internal error|unavailable/i.test(
@@ -189,12 +204,6 @@ const embedRequest = async (payload) => {
 
   return embedding;
 };
-
-const extractGeminiText = (responseBody) =>
-  responseBody?.candidates?.[0]?.content?.parts
-    ?.map((part) => part?.text || "")
-    .join("")
-    .trim() || "";
 
 const parseLabelList = (value) => {
   if (Array.isArray(value)) {
@@ -315,7 +324,7 @@ const safeParseJson = (value) => {
   }
 };
 
-const parseGeminiCaptionText = (value) => {
+const parseCaptionText = (value) => {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return { caption: null, labels: [] };
 
@@ -345,6 +354,90 @@ const generateImageCaptionWithModel = async ({
     `Original file name: ${originalFileName || "unknown"}`,
   ].join("\n");
 
+  if (!hfClient) {
+    throw new Error("HF_TOKEN is required for image captions");
+  }
+
+  const response = await hfClient.chatCompletion({
+    model: modelName,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: prompt,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType.toLowerCase()};base64,${buffer.toString("base64")}`,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  const message = response?.choices?.[0]?.message;
+  const rawText = Array.isArray(message?.content)
+    ? message.content
+        .map((part) => part?.text || part?.content || "")
+        .join("")
+        .trim()
+    : typeof message?.content === "string"
+      ? message.content.trim()
+      : typeof message?.text === "string"
+        ? message.text.trim()
+        : "";
+  const parsedJson = safeParseJson(rawText) || {};
+  const parsedText = parseCaptionText(rawText);
+  const caption = isNonEmptyString(parsedJson.caption)
+    ? parsedJson.caption.trim()
+    : parsedText.caption || rawText;
+  const labels =
+    parseLabelList(parsedJson.labels).length > 0
+      ? parseLabelList(parsedJson.labels)
+      : parsedText.labels;
+
+  const fallbackLabels =
+    labels.length > 0
+      ? labels
+      : deriveFallbackLabels({
+          caption,
+          originalFileName,
+          extractedContent: "",
+        });
+
+  return {
+    caption,
+    labels: fallbackLabels,
+    rawText,
+    model: modelName,
+  };
+};
+
+const generateGeminiImageCaptionWithModel = async ({
+  buffer,
+  mimeType,
+  originalFileName,
+  modelName,
+}) => {
+  const prompt = [
+    "You are generating searchable image metadata.",
+    'Return ONLY valid JSON with this shape: {"caption": string, "labels": string[] }',
+    "Rules:",
+    "- caption should be concise and describe the main subject and scene",
+    "- labels should contain 5 to 10 broad search-friendly tags",
+    "- include broader concepts when useful, for example animal, wildlife, beach, nature, vehicle, person, document",
+    "- do not add markdown, code fences, or extra commentary",
+    `Original file name: ${originalFileName || "unknown"}`,
+  ].join("\n");
+
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is required for fallback image captions");
+  }
+
   const responseBody = await postJsonWithApiKey(
     buildGeminiUrl(modelName),
     GEMINI_API_KEY,
@@ -371,7 +464,7 @@ const generateImageCaptionWithModel = async ({
 
   const rawText = extractGeminiText(responseBody);
   const parsedJson = safeParseJson(rawText) || {};
-  const parsedText = parseGeminiCaptionText(rawText);
+  const parsedText = parseCaptionText(rawText);
   const caption = isNonEmptyString(parsedJson.caption)
     ? parsedJson.caption.trim()
     : parsedText.caption || rawText;
@@ -380,38 +473,53 @@ const generateImageCaptionWithModel = async ({
       ? parseLabelList(parsedJson.labels)
       : parsedText.labels;
 
-  const fallbackLabels =
-    labels.length > 0
-      ? labels
-      : deriveFallbackLabels({
-          caption,
-          originalFileName,
-          extractedContent: "",
-        });
-
   return {
     caption,
-    labels: fallbackLabels,
+    labels:
+      labels.length > 0
+        ? labels
+        : deriveFallbackLabels({
+            caption,
+            originalFileName,
+            extractedContent: "",
+          }),
     rawText,
     model: modelName,
   };
 };
 
-export const generateImageCaption = async ({
+const generateImageCaptionWithFallback = async ({
   buffer,
   mimeType,
   originalFileName,
 }) => {
-  if (!buffer || !isImageMimeType(mimeType) || buffer.length === 0) {
-    return null;
-  }
+  let hfResult = null;
+  const hfPayload = {
+    buffer,
+    mimeType,
+    originalFileName,
+    modelName: HF_IMAGE_MODEL,
+  };
 
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is required for image captions");
-  }
+  try {
+    hfResult = await generateImageCaptionWithModel(hfPayload);
+    if (
+      isNonEmptyString(hfResult?.caption) &&
+      Array.isArray(hfResult?.labels) &&
+      hfResult.labels.length > 0
+    ) {
+      return hfResult;
+    }
+  } catch (error) {
+    console.error("Hugging Face image caption failed, trying Gemini fallback", {
+      fileName: originalFileName,
+      mimeType,
+      error: error instanceof Error ? error.message : String(error),
+    });
 
-  if (buffer.length > GEMINI_IMAGE_SIZE_LIMIT) {
-    throw new Error("Image is too large for Gemini captioning");
+    if (!isRetryableGeminiError(error)) {
+      // Fall through to Gemini anyway; HF is the primary path, but Gemini can still recover.
+    }
   }
 
   const modelCandidates = [GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS]
@@ -422,7 +530,7 @@ export const generateImageCaption = async ({
   let lastError = null;
   for (const modelName of modelCandidates) {
     try {
-      return await generateImageCaptionWithModel({
+      return await generateGeminiImageCaptionWithModel({
         buffer,
         mimeType,
         originalFileName,
@@ -443,7 +551,35 @@ export const generateImageCaption = async ({
     }
   }
 
-  throw lastError || new Error("Gemini caption generation failed");
+  if (hfResult) {
+    return hfResult;
+  }
+
+  throw lastError || new Error("Image caption generation failed");
+};
+
+export const generateImageCaption = async ({
+  buffer,
+  mimeType,
+  originalFileName,
+}) => {
+  if (!buffer || !isImageMimeType(mimeType) || buffer.length === 0) {
+    return null;
+  }
+
+  if (!HF_TOKEN && !GEMINI_API_KEY) {
+    throw new Error("HF_TOKEN or GEMINI_API_KEY is required for image captions");
+  }
+
+  if (buffer.length > HF_IMAGE_SIZE_LIMIT && buffer.length > GEMINI_IMAGE_SIZE_LIMIT) {
+    throw new Error("Image is too large for captioning");
+  }
+
+  return await generateImageCaptionWithFallback({
+    buffer,
+    mimeType,
+    originalFileName,
+  });
 };
 
 export const embedSearchQuery = async (query) => {
@@ -491,7 +627,7 @@ export const embedFileSemanticContent = async ({
         originalFileName,
       });
     } catch (error) {
-      console.error("Gemini image caption failed", {
+      console.error("Hugging Face image caption failed", {
         fileName: originalFileName,
         mimeType,
         error: error instanceof Error ? error.message : String(error),
