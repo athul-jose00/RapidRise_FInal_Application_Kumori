@@ -64,7 +64,7 @@ const start = async () => {
   try {
     await prisma.$connect();
     console.log("Prisma connected");
-    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    const server = app.listen(PORT);
     server.on("error", (err) => {
       console.error("Server listen error:", err && err.stack ? err.stack : err);
       if (err && err.code === "EADDRINUSE") {

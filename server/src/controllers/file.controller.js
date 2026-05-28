@@ -1,7 +1,10 @@
 import prisma from "../config/prisma.js";
 import cloudinary from "../config/cloudinary.js";
+import supabase from "../config/supabase.js";
 import crypto from "crypto";
 import path from "node:path";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { extractFileContent } from "../utils/content-extractor.js";
@@ -45,7 +48,120 @@ const uploadBufferToCloudinary = (file, userId) =>
     uploadStream.end(file.buffer);
   });
 
+const uploadBufferToSupabase = async (file, userId) => {
+  if (!supabase) throw new Error("Supabase not configured");
+  const bucket = process.env.SUPABASE_BUCKET_NAME || "files";
+  const extension =
+    path.extname(file.originalname || "").replace(/^\./, "") || "bin";
+  const objectPath = `rapidrise/${userId}/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(objectPath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false,
+    });
+
+  if (error) throw error;
+
+  // create signed url for download access (short lived)
+  const { data: urlData, error: urlErr } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(objectPath, 60 * 60); // 1 hour
+
+  if (urlErr) throw urlErr;
+
+  return { path: objectPath, publicUrl: urlData?.signedUrl || null };
+};
+
+const saveBufferToLocal = async (file, userId) => {
+  const extension =
+    path.extname(file.originalname || "").replace(/^\./, "") || "bin";
+  const objectPath = `rapidrise/${userId}/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
+  const uploadsRoot = path.join(process.cwd(), "server", "uploads");
+  const fullPath = path.join(uploadsRoot, objectPath);
+  await fsp.mkdir(path.dirname(fullPath), { recursive: true });
+  await fsp.writeFile(fullPath, file.buffer);
+  // publicUrl served via express static /uploads
+  return { path: objectPath, publicUrl: `/uploads/${objectPath}` };
+};
+
+const normalizeUploadError = (err) => {
+  const message = String(err?.message || err || "");
+
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return {
+      status: 400,
+      message: "File size too large. Please upload a smaller file.",
+    };
+  }
+
+  if (
+    message.toLowerCase().includes("upgrade your plan") ||
+    message.toLowerCase().includes("file limit") ||
+    message.toLowerCase().includes("file too large")
+  ) {
+    return {
+      status: 400,
+      message: "File size too large. Please upload a smaller file.",
+    };
+  }
+
+  return { status: 500, message: "Upload error" };
+};
+
 const streamDownload = async (res, file) => {
+  // If file stored locally
+  if (file.storageBackend === "local" && file.storedFileName) {
+    const fullPath = path.join(
+      process.cwd(),
+      "server",
+      "uploads",
+      file.storedFileName,
+    );
+    if (!fs.existsSync(fullPath)) throw new Error("Local file not found");
+
+    const readStream = fs.createReadStream(fullPath);
+    res.set("Content-Type", file.mimeType);
+    res.set(
+      "Content-Disposition",
+      `attachment; filename="${file.originalFileName}"`,
+    );
+    res.set("Access-Control-Expose-Headers", "Content-Disposition");
+    await pipeline(readStream, res);
+    return;
+  }
+
+  // If file stored in Supabase, generate a signed URL and stream
+  if (file.storageBackend === "supabase" && file.supabasePath) {
+    const bucket = process.env.SUPABASE_BUCKET_NAME || "files";
+    const { data: urlData, error: urlErr } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(file.supabasePath, 60 * 60);
+
+    if (urlErr) throw urlErr;
+    const signedUrl = urlData?.signedUrl;
+    if (!signedUrl) throw new Error("Unable to generate Supabase signed URL");
+
+    const response = await fetch(signedUrl);
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Unable to download file from Supabase (${response.status})`,
+      );
+    }
+
+    res.set("Content-Type", file.mimeType);
+    res.set(
+      "Content-Disposition",
+      `attachment; filename="${file.originalFileName}"`,
+    );
+    res.set("Access-Control-Expose-Headers", "Content-Disposition");
+
+    await pipeline(Readable.fromWeb(response.body), res);
+    return;
+  }
+
+  // default: Cloudinary
   const downloadUrl = cloudinary.utils.private_download_url(
     file.cloudinaryPublicId,
     getDownloadFormat(file),
@@ -82,7 +198,7 @@ const uploadFiles = async (req, res) => {
     const userId = req.user.id;
     const agg = await prisma.file.aggregate({
       _sum: { fileSize: true },
-      where: { userId },
+      where: { userId, isTrashed: false },
     });
     const total = Number(agg._sum.fileSize ?? 0);
     const incomingTotal = req.files.reduce((s, f) => s + f.size, 0);
@@ -90,20 +206,66 @@ const uploadFiles = async (req, res) => {
       return res.status(400).json({ message: "User storage quota exceeded" });
 
     const created = [];
+    const hostedFlag = String(process.env.HOSTED || "true").toLowerCase();
+    const hosted = hostedFlag !== "false" && hostedFlag !== "0";
+
     for (const f of req.files) {
-      const cloudinaryResult = await uploadBufferToCloudinary(f, userId);
-      const record = await prisma.file.create({
-        data: {
-          userId,
-          originalFileName: f.originalname,
+      // choose backend based on mime type
+      const docTypes = [
+        "application/pdf",
+        "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ];
+
+      let recordData = {
+        userId,
+        originalFileName: f.originalname,
+        fileSize: BigInt(f.size),
+        mimeType: f.mimetype,
+      };
+
+      if (!hosted) {
+        // local storage
+        const localRes = await saveBufferToLocal(f, userId);
+        recordData = {
+          ...recordData,
+          storageBackend: "local",
+          storedFileName: localRes.path,
+          supabasePath: null,
+          cloudinaryPublicId: null,
+          cloudinaryResourceType: null,
+          cloudinaryUrl: localRes.publicUrl || null,
+        };
+      } else if (docTypes.includes(f.mimetype)) {
+        // upload to Supabase
+        const supaRes = await uploadBufferToSupabase(f, userId);
+        recordData = {
+          ...recordData,
+          storageBackend: "supabase",
+          supabasePath: supaRes.path,
+          storedFileName: supaRes.path,
+          cloudinaryPublicId: null,
+          cloudinaryResourceType: null,
+          cloudinaryUrl: supaRes.publicUrl || null,
+        };
+      } else {
+        const cloudinaryResult = await uploadBufferToCloudinary(f, userId);
+        recordData = {
+          ...recordData,
+          storageBackend: "cloudinary",
           storedFileName: cloudinaryResult.public_id,
           cloudinaryPublicId: cloudinaryResult.public_id,
           cloudinaryResourceType: cloudinaryResult.resource_type || "raw",
           cloudinaryUrl: cloudinaryResult.secure_url,
-          fileSize: BigInt(f.size),
-          mimeType: f.mimetype,
-        },
-      });
+        };
+      }
+
+      const record = await prisma.file.create({ data: recordData });
 
       let contentIndexed = false;
       let extractionError = null;
@@ -232,7 +394,8 @@ const uploadFiles = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Upload error" });
+    const uploadError = normalizeUploadError(err);
+    res.status(uploadError.status).json({ message: uploadError.message });
   }
 };
 
@@ -244,7 +407,7 @@ const listFiles = async (req, res) => {
     const skip = (page - 1) * limit;
     const search = req.query.q || "";
 
-    const where = { userId };
+    const where = { userId, isTrashed: false };
     if (search)
       where.originalFileName = { contains: search, mode: "insensitive" };
 
@@ -254,6 +417,17 @@ const listFiles = async (req, res) => {
         take: limit,
         skip,
         orderBy: { createdAt: "desc" },
+        include: {
+          shares: true,
+          owner: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          fileContent: true,
+        },
       }),
       prisma.file.count({ where }),
     ]);
@@ -290,38 +464,163 @@ const deleteFile = async (req, res) => {
     if (file.userId !== req.user.id)
       return res.status(403).json({ message: "Access denied" });
 
-    if (file.cloudinaryPublicId) {
-      try {
-        await cloudinary.uploader.destroy(file.cloudinaryPublicId, {
-          resource_type: file.cloudinaryResourceType || "raw",
-        });
-      } catch (e) {
-        console.error("cloudinary delete error", e);
-      }
-    }
-    // remove dependent records first to avoid FK constraint errors
+    // remove public shares so links no longer work
     try {
       await prisma.fileShare.deleteMany({ where: { fileId: id } });
     } catch (e) {
       console.error("Failed to delete related FileShare records", e);
     }
-    try {
-      await prisma.fileContent.deleteMany({ where: { fileId: id } });
-    } catch (e) {
-      console.error("Failed to delete related FileContent records", e);
-    }
-    try {
-      await prisma.fileEmbedding.deleteMany({ where: { fileId: id } });
-    } catch (e) {
-      console.error("Failed to delete related FileEmbedding records", e);
-    }
 
-    await prisma.file.delete({ where: { id } });
-    res.json({ message: "File deleted" });
+    // soft-delete: mark trashed and set trashedAt; keep cloudinary object for possible restore
+    await prisma.file.update({
+      where: { id },
+      data: { isTrashed: true, trashedAt: new Date() },
+    });
+    res.json({ message: "File moved to trash" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Delete error" });
   }
 };
 
-export { uploadFiles, listFiles, downloadFile, deleteFile };
+const listTrashedFiles = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const rows = await prisma.file.findMany({
+      where: { userId, isTrashed: true },
+      orderBy: { trashedAt: "desc" },
+      include: {
+        shares: true,
+        owner: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        fileContent: true,
+      },
+    });
+    const files = rows.map((f) => ({ ...f, fileSize: Number(f.fileSize) }));
+    res.json({ files });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "List trash error" });
+  }
+};
+
+const restoreFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = await prisma.file.findUnique({ where: { id } });
+    if (!file) return res.status(404).json({ message: "File not found" });
+    if (file.userId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+    if (!file.isTrashed)
+      return res.status(400).json({ message: "File is not in trash" });
+
+    // compute current used storage (exclude trashed)
+    const agg = await prisma.file.aggregate({
+      _sum: { fileSize: true },
+      where: { userId: req.user.id, isTrashed: false },
+    });
+    const used = Number(agg._sum.fileSize ?? 0);
+    const fileSize = Number(file.fileSize);
+    if (used + fileSize > MAX_USER_STORAGE) {
+      return res.status(400).json({
+        message:
+          "Restore would exceed your storage quota. Free space or upgrade first.",
+      });
+    }
+
+    await prisma.file.update({
+      where: { id },
+      data: { isTrashed: false, trashedAt: null },
+    });
+    res.json({ message: "File restored" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Restore error" });
+  }
+};
+
+const purgeFileAssets = async (file) => {
+  try {
+    await prisma.fileShare.deleteMany({ where: { fileId: file.id } });
+  } catch (e) {
+    console.error("Failed to delete related FileShare records", e);
+  }
+
+  try {
+    await prisma.fileContent.deleteMany({ where: { fileId: file.id } });
+  } catch (e) {
+    console.error("Failed to delete related FileContent records", e);
+  }
+
+  try {
+    await prisma.fileEmbedding.deleteMany({ where: { fileId: file.id } });
+  } catch (e) {
+    console.error("Failed to delete related FileEmbedding records", e);
+  }
+
+  if (file.storageBackend === "supabase" && file.supabasePath) {
+    try {
+      const bucket = process.env.SUPABASE_BUCKET_NAME || "files";
+      await supabase.storage.from(bucket).remove([file.supabasePath]);
+    } catch (e) {
+      console.error("supabase delete error", e);
+    }
+  } else if (file.storageBackend === "local" && file.storedFileName) {
+    try {
+      const fullPath = path.join(
+        process.cwd(),
+        "server",
+        "uploads",
+        file.storedFileName,
+      );
+      await fsp.unlink(fullPath).catch(() => {});
+    } catch (e) {
+      console.error("local delete error", e);
+    }
+  } else if (file.cloudinaryPublicId) {
+    try {
+      await cloudinary.uploader.destroy(file.cloudinaryPublicId, {
+        resource_type: file.cloudinaryResourceType || "raw",
+      });
+    } catch (e) {
+      console.error("cloudinary delete error", e);
+    }
+  }
+};
+
+const permanentlyDeleteFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = await prisma.file.findUnique({ where: { id } });
+    if (!file) return res.status(404).json({ message: "File not found" });
+    if (file.userId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+    if (!file.isTrashed)
+      return res
+        .status(400)
+        .json({ message: "File must be in trash before permanent deletion" });
+
+    await purgeFileAssets(file);
+    await prisma.file.delete({ where: { id } });
+
+    res.json({ message: "File permanently deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Permanent delete error" });
+  }
+};
+
+export {
+  uploadFiles,
+  listFiles,
+  downloadFile,
+  deleteFile,
+  listTrashedFiles,
+  restoreFile,
+  permanentlyDeleteFile,
+};

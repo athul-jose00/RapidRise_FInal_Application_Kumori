@@ -5,10 +5,52 @@ import crypto from "crypto";
 import { sendResetEmail } from "../utils/email.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
+const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || "15m";
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || "7d";
 const SPECIAL_CHAR_PATTERN = /[!@#$%^&*(),.?":{}|<>]/;
 
-const generateToken = (user) =>
-  jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+const durationToMs = (duration) => {
+  const value = String(duration || "").trim();
+  const match = value.match(/^(\d+)([smhd])$/i);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multipliers = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+
+  return amount * multipliers[unit];
+};
+
+// Short-lived access token
+const generateAccessToken = (user) =>
+  jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+  });
+
+// Create a refresh token and session record (7 days)
+const generateRefreshToken = async (userId, ipAddress, userAgent) => {
+  const token = crypto.randomBytes(40).toString("hex");
+  const expiresAt = new Date(
+    Date.now() + durationToMs(REFRESH_TOKEN_EXPIRES_IN),
+  );
+
+  await prisma.session.create({
+    data: {
+      userId,
+      refreshToken: token,
+      ipAddress,
+      userAgent,
+      expiresAt,
+    },
+  });
+
+  return token;
+};
 
 const validatePassword = (password) => {
   if (password.length < 8) {
@@ -64,15 +106,25 @@ const register = async (req, res) => {
       },
     });
 
-    const token = generateToken(user);
+    // Issue access token and refresh session on register so client can stay logged in
+    const accessToken = generateAccessToken(user);
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get("user-agent");
+    const refreshToken = await generateRefreshToken(
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+
     return res.status(201).json({
-      token,
+      accessToken,
       user: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
       },
+      refreshToken,
     });
   } catch (err) {
     console.error(err);
@@ -107,10 +159,19 @@ const login = async (req, res) => {
         .json({ message: "Incorrect password. Please try again" });
     }
 
-    const token = generateToken(user);
+    // Issue access + refresh (create session)
+    const accessToken = generateAccessToken(user);
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get("user-agent");
+    const refreshToken = await generateRefreshToken(
+      user.id,
+      ipAddress,
+      userAgent,
+    );
 
     return res.json({
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -227,4 +288,153 @@ const resetPassword = async (req, res) => {
   }
 };
 
-export { register, login, changePassword, forgotPassword, resetPassword };
+// Exchange a refresh token for a new access token
+const refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token is required" });
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { refreshToken },
+    });
+
+    if (!session)
+      return res.status(403).json({ message: "Invalid refresh token" });
+
+    if (!session.isActive)
+      return res.status(403).json({ message: "Session is no longer active" });
+
+    if (session.expiresAt < new Date()) {
+      await prisma.session.delete({ where: { id: session.id } });
+      return res
+        .status(403)
+        .json({ message: "Refresh token expired, please login again" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
+    if (!user) return res.status(403).json({ message: "User not found" });
+
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { lastUsedAt: new Date() },
+    });
+
+    const accessToken = generateAccessToken(user);
+
+    return res.status(200).json({ message: "Token refreshed", accessToken });
+  } catch (err) {
+    console.error("Refresh error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Logout: revoke a specific refresh token / session
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken)
+      return res.status(400).json({ message: "Refresh token is required" });
+
+    const session = await prisma.session.findUnique({
+      where: { refreshToken },
+    });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    await prisma.session.delete({ where: { id: session.id } });
+    return res.status(200).json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getAllSessions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const sessions = await prisma.session.findMany({
+      where: { userId, isActive: true },
+      select: {
+        id: true,
+        ipAddress: true,
+        createdAt: true,
+        lastUsedAt: true,
+        expiresAt: true,
+      },
+      orderBy: { lastUsedAt: "desc" },
+    });
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Active sessions retrieved",
+        sessions,
+        totalSessions: sessions.length,
+      });
+  } catch (err) {
+    console.error("Get sessions error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const revokeSession = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { sessionId } = req.params;
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session || session.userId !== userId)
+      return res.status(404).json({ message: "Session not found" });
+    await prisma.session.delete({ where: { id: sessionId } });
+    return res
+      .status(200)
+      .json({ success: true, message: "Session revoked successfully" });
+  } catch (err) {
+    console.error("Revoke session error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const revokeAllOtherSessions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentRefreshToken } = req.body;
+    if (!currentRefreshToken)
+      return res
+        .status(400)
+        .json({ message: "Current refresh token required" });
+
+    await prisma.session.deleteMany({
+      where: { userId, refreshToken: { not: currentRefreshToken } },
+    });
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "All other sessions revoked successfully",
+      });
+  } catch (err) {
+    console.error("Revoke all sessions error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export {
+  register,
+  login,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+  refresh,
+  logout,
+  getAllSessions,
+  revokeSession,
+  revokeAllOtherSessions,
+};

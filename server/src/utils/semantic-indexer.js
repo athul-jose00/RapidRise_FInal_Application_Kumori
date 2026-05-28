@@ -568,10 +568,15 @@ export const generateImageCaption = async ({
   }
 
   if (!HF_TOKEN && !GEMINI_API_KEY) {
-    throw new Error("HF_TOKEN or GEMINI_API_KEY is required for image captions");
+    throw new Error(
+      "HF_TOKEN or GEMINI_API_KEY is required for image captions",
+    );
   }
 
-  if (buffer.length > HF_IMAGE_SIZE_LIMIT && buffer.length > GEMINI_IMAGE_SIZE_LIMIT) {
+  if (
+    buffer.length > HF_IMAGE_SIZE_LIMIT &&
+    buffer.length > GEMINI_IMAGE_SIZE_LIMIT
+  ) {
     throw new Error("Image is too large for captioning");
   }
 

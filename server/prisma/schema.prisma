@@ -27,11 +27,17 @@ model File {
   userId           String
   originalFileName String
   storedFileName   String
-  cloudinaryPublicId String   @unique
-  cloudinaryResourceType String
-  cloudinaryUrl    String
+  cloudinaryPublicId String?  @unique
+  cloudinaryResourceType String?
+  cloudinaryUrl    String?
+  // storage backend: 'cloudinary' or 'supabase'
+  storageBackend   String?
+  // for supabase-stored objects: path within bucket
+  supabasePath     String?
   fileSize         BigInt
   mimeType         String
+  isTrashed        Boolean   @default(false)
+  trashedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   owner            User      @relation(fields: [userId], references: [id])
