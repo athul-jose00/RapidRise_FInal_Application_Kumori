@@ -371,14 +371,12 @@ const getAllSessions = async (req, res) => {
       orderBy: { lastUsedAt: "desc" },
     });
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Active sessions retrieved",
-        sessions,
-        totalSessions: sessions.length,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Active sessions retrieved",
+      sessions,
+      totalSessions: sessions.length,
+    });
   } catch (err) {
     console.error("Get sessions error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -417,12 +415,10 @@ const revokeAllOtherSessions = async (req, res) => {
       where: { userId, refreshToken: { not: currentRefreshToken } },
     });
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "All other sessions revoked successfully",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "All other sessions revoked successfully",
+    });
   } catch (err) {
     console.error("Revoke all sessions error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -446,7 +442,7 @@ const updateProfileImage = async (req, res) => {
           console.error("Cloudinary upload error:", error);
           return res.status(500).json({ message: "Image upload failed" });
         }
-        
+
         try {
           const user = await prisma.user.update({
             where: { id: userId },
@@ -461,18 +457,19 @@ const updateProfileImage = async (req, res) => {
               firstName: user.firstName,
               lastName: user.lastName,
               profileImage: user.profileImage,
-            }
+            },
           });
         } catch (dbError) {
           console.error("Database update error:", dbError);
-          return res.status(500).json({ message: "Failed to update profile image in database" });
+          return res
+            .status(500)
+            .json({ message: "Failed to update profile image in database" });
         }
-      }
+      },
     );
 
     // Write the buffer to the upload stream
     uploadStream.end(req.file.buffer);
-
   } catch (err) {
     console.error("Profile image update error:", err);
     return res.status(500).json({ message: "Server error" });
