@@ -19,14 +19,14 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { API_ROOT } from "../../api/axios";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 // Configure PDFJS Worker using local Vite resolution
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
+  import.meta.url
 ).toString();
 
 export default function FilePreview({
@@ -61,8 +61,8 @@ export default function FilePreview({
       if (entries[0]) {
         // contentRect width does not include padding or scrollbars
         const width = entries[0].contentRect.width;
-        // Subtract horizontal padding and vertical scrollbar allowance
-        setContainerWidth(Math.max(200, width - 48));
+        // Subtract horizontal padding (p-4 is 16px on each side, total 32px)
+        setContainerWidth(Math.max(200, width - 32));
       }
     });
     observer.observe(containerRef.current);
@@ -129,8 +129,8 @@ export default function FilePreview({
   };
 
   const mimeGroup = getFileMimeGroup();
-  const imageUrl = file?.cloudinaryUrl?.startsWith("http")
-    ? file.cloudinaryUrl
+  const imageUrl = file?.cloudinaryUrl?.startsWith("http") 
+    ? file.cloudinaryUrl 
     : `${API_ROOT}/api/files/${file?.id}/download?token=${accessToken}`;
 
   // Dynamically partition document text to enable page turning
@@ -150,10 +150,7 @@ export default function FilePreview({
   };
 
   const pages = getPagesArray();
-  const totalPages =
-    mimeGroup === "PDF" && numPages
-      ? numPages
-      : file?.fileContent?.pageCount || pages.length || 1;
+  const totalPages = mimeGroup === "PDF" && numPages ? numPages : (file?.fileContent?.pageCount || pages.length || 1);
   const currentPageContent = pages[activePage - 1] || pages[0] || "";
 
   const activityList = [
@@ -178,92 +175,135 @@ export default function FilePreview({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#0b0f19] text-slate-200 overflow-hidden font-sans">
+    <div className="flex flex-col grow bg-white min-h-0 overflow-y-auto">
       {/* Top Preview Action Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-[#0f1422]/90 backdrop-blur-md border-b border-[#1e293b]/50 shrink-0 w-full z-15">
-        <div className="flex items-center gap-2.5">
-          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider select-none">
-            {getFileExtensionLabel()}
-          </span>
-          <h2 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-md" title={getSafeFileName()}>
-            {getSafeFileName()}
-          </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border-b border-slate-100 gap-4 shrink-0 w-full">
+        <div className="flex items-center justify-between sm:justify-start gap-3.5 w-full sm:w-auto min-w-0">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer transition-colors outline-none shrink-0"
+          >
+            <ArrowLeft size={14} /> 
+            <span className="hidden xs:inline">Back to files</span>
+            <span className="inline xs:hidden">Back</span>
+          </button>
+
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-slate-400 shrink-0">
+              {mimeGroup === "PDF" && (
+                <FileText size={18} color="#DC2626" />
+              )}
+              {mimeGroup === "Text" && (
+                <FileText size={18} color="#2563EB" />
+              )}
+              {mimeGroup === "Word" && (
+                <FileText size={18} color="#2563EB" />
+              )}
+              {mimeGroup === "Excel" && (
+                <FileSpreadsheet size={18} className="text-emerald-500" />
+              )}
+              {mimeGroup === "Image" && (
+                <ImageIcon size={18} className="text-cyan-500" />
+              )}
+              {mimeGroup === "Document" && (
+                <File size={18} className="text-slate-500" />
+              )}
+            </span>
+            <h2
+              className="text-sm font-bold text-slate-800 truncate max-w-[120px] sm:max-w-xs"
+              title={getSafeFileName()}
+            >
+              {getSafeFileName()}
+            </h2>
+            <button
+              onClick={() => {
+                setStarred(!starred);
+                toast.success(
+                  starred ? "Removed from starred" : "Added to starred",
+                );
+              }}
+              className="text-slate-400 hover:text-amber-500 cursor-pointer border-none bg-transparent outline-none p-0 flex items-center shrink-0"
+            >
+              <Star
+                size={15}
+                fill={starred ? "#f59e0b" : "none"}
+                className={starred ? "text-amber-500" : "text-slate-400"}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Page / Zoom / Options Controls */}
-        <div className="flex items-center gap-2.5">
-          {/* Zoom Controls Pill */}
-          <div className="flex items-center gap-2 bg-[#1e293b]/60 border border-[#334155]/60 rounded-xl px-3 py-1.5 text-xs text-white">
+        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+          <div className="flex items-center gap-2 border border-slate-200/80 rounded-xl px-2.5 py-1.5 bg-white text-xs text-slate-650">
             <button
               onClick={() => setZoom(Math.max(50, zoom - 10))}
-              className="hover:text-slate-350 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
-              title="Zoom Out"
+              className="hover:bg-slate-50 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
             >
-              <ZoomOut size={13} />
+              <ZoomOut size={14} />
             </button>
-            <span className="font-semibold min-w-10 text-center select-none">{zoom}%</span>
+            <span className="font-semibold min-w-10 text-center">{zoom}%</span>
             <button
               onClick={() => setZoom(Math.min(200, zoom + 10))}
-              className="hover:text-slate-350 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
-              title="Zoom In"
+              className="hover:bg-slate-50 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
             >
-              <ZoomIn size={13} />
+              <ZoomIn size={14} />
             </button>
           </div>
 
-          {/* Download Button */}
-          <button
-            onClick={(e) => handleDownload(file, e)}
-            className="p-2 bg-[#1e293b]/60 border border-[#334155]/60 rounded-xl text-white hover:bg-[#2b394f] transition-all cursor-pointer outline-none flex items-center justify-center"
-            title="Download file"
-          >
-            <Download size={14} />
-          </button>
+          <div className="w-[1px] h-4 bg-slate-200 hidden sm:block" />
 
-          {/* Close Button */}
-          <button
-            onClick={onBack}
-            className="px-4 py-2 bg-[#1e293b]/60 border border-[#334155]/60 rounded-xl text-white hover:bg-[#2b394f] hover:border-slate-500/50 text-xs font-semibold cursor-pointer transition-all outline-none"
-          >
-            Close
-          </button>
+          {/* Tools */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => openShareModal(file, e)}
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all cursor-pointer border border-slate-200 hover:border-blue-100 outline-none flex items-center justify-center"
+              title="Share"
+            >
+              <Share2 size={15} />
+            </button>
+            <button
+              onClick={(e) => handleDownload(file, e)}
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-[#c62828] hover:text-white transition-all cursor-pointer border border-slate-200 outline-none flex items-center justify-center"
+              title="Download"
+            >
+              <Download size={15} />
+            </button>
+            <button
+              onClick={(e) => {
+                handleDelete(file.id, e);
+                onBack();
+              }}
+              className="p-2 rounded-xl hover:bg-red-50 text-red-500 transition-all cursor-pointer border border-slate-200 bg-transparent outline-none flex items-center justify-center"
+              title="Delete"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Split Grid */}
-      <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_320px] min-h-0 items-stretch relative">
-        
-        {/* Ambient backdrop for image previews */}
-        {mimeGroup === "Image" && (
-          <div
-            className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-[0.12] filter blur-[60px] scale-[1.2] transition-all duration-300 z-0"
-            style={{ backgroundImage: `url(${imageUrl})` }}
-          />
-        )}
-
+      <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(0,1.25fr)_360px] gap-5 p-4 sm:p-6 min-h-0 overflow-y-auto items-stretch">
         {/* Left: Interactive Canvas Box */}
-        <div className="relative flex-1 flex flex-col items-center justify-center p-6 min-h-0 overflow-auto z-10">
+        <div className="bg-transparent rounded-3xl p-2 sm:p-3 min-h-[60vh] lg:min-h-[calc(100vh-140px)] flex flex-col items-center justify-start overflow-x-hidden overflow-y-auto self-stretch relative w-full">
           <div
-            className="transition-transform duration-200 origin-center max-w-full flex justify-center items-center"
-            style={{
-              transform: mimeGroup === "PDF" ? "none" : `scale(${zoom / 100})`,
-            }}
+            className="transition-transform duration-200 origin-top max-w-full flex justify-center w-full"
+            style={{ transform: mimeGroup === "PDF" ? 'none' : `scale(${zoom / 100})` }}
           >
             {mimeGroup === "Image" ? (
               <img
                 src={imageUrl}
                 alt={getSafeFileName()}
-                className="rounded-2xl object-contain max-h-[70vh] max-w-full shadow-2xl border border-slate-900/60"
+                className="rounded-2xl object-contain max-h-[60vh] max-w-full shadow-lg border border-slate-800/15"
               />
             ) : mimeGroup === "PDF" ? (
-              <div className="bg-[#0f1422] p-2 rounded-2xl shadow-2xl overflow-hidden flex flex-row max-w-full w-full min-h-[calc(100vh-160px)] relative border border-[#1e293b]/30">
+              <div className="bg-slate-100/60 p-2 rounded-2xl shadow-inner overflow-hidden flex flex-row max-w-full w-full min-h-[calc(100vh-180px)] relative">
                 {isPdfLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center p-8 bg-[#0f1422]/95 z-10 rounded-2xl">
+                  <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-100/60 z-10 rounded-2xl">
                     <div className="flex flex-col items-center justify-center gap-3 text-center">
-                      <div className="w-8 h-8 rounded-full border-3 border-[#1e293b] border-t-[#c62828] animate-spin" />
-                      <span className="text-slate-400 font-semibold">
-                        Loading PDF...
-                      </span>
+                      <div className="w-8 h-8 rounded-full border-3 border-slate-200 border-t-[#c62828] animate-spin" />
+                      <span className="text-slate-550 font-semibold">Loading PDF...</span>
                     </div>
                   </div>
                 )}
@@ -284,15 +324,15 @@ export default function FilePreview({
                 >
                   {/* PDF Thumbnails panel inside Document wrapper */}
                   {numPages > 0 && (
-                    <div className="hidden md:flex flex-col gap-4 border-r border-[#1e293b]/40 bg-[#070b13]/55 p-4 w-[112px] shrink-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-180px)] items-center">
+                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-200 bg-slate-50/50 p-4 w-[112px] shrink-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-210px)] items-center">
                       {Array.from(new Array(numPages), (el, index) => (
                         <button
                           key={index}
                           onClick={() => setActivePage(index + 1)}
-                          className={`flex flex-col items-center p-1 rounded-xl transition-all border-2 w-18 cursor-pointer focus:outline-none bg-[#111625] ${
+                          className={`flex flex-col items-center p-1 rounded-xl transition-all border-2 w-18 cursor-pointer focus:outline-none bg-white ${
                             activePage === index + 1
                               ? "border-[#c62828] shadow-xs"
-                              : "border-transparent hover:border-[#1e293b]"
+                              : "border-transparent hover:border-slate-300"
                           }`}
                         >
                           <div className="w-full overflow-hidden rounded bg-white flex justify-center pointer-events-none">
@@ -301,16 +341,12 @@ export default function FilePreview({
                               scale={0.08}
                               renderAnnotationLayer={false}
                               renderTextLayer={false}
-                              loading={
-                                <div className="h-14 w-10 bg-slate-800 animate-pulse" />
-                              }
+                              loading={<div className="h-14 w-10 bg-slate-100 animate-pulse" />}
                             />
                           </div>
                           <span
                             className={`text-[9px] mt-1 font-bold ${
-                              activePage === index + 1
-                                ? "text-[#c62828]"
-                                : "text-slate-400"
+                              activePage === index + 1 ? "text-[#c62828]" : "text-slate-500"
                             }`}
                           >
                             {index + 1}
@@ -321,19 +357,15 @@ export default function FilePreview({
                   )}
 
                   {/* Main PDF Page Display Canvas */}
-                  <div
+                  <div 
                     ref={containerRef}
-                    className="flex-1 overflow-auto p-4 flex items-start justify-center max-h-[calc(100vh-180px)] w-full"
+                    className="flex-1 overflow-auto p-4 flex items-start justify-center max-h-[calc(100vh-210px)] w-full"
                   >
                     <Page
                       pageNumber={activePage}
-                      width={
-                        containerWidth
-                          ? containerWidth * (zoom / 100)
-                          : undefined
-                      }
-                      scale={containerWidth ? undefined : zoom / 100}
-                      className="shadow-md rounded border border-[#1e293b]/55 bg-white max-w-full"
+                      width={containerWidth ? containerWidth * (zoom / 100) : undefined}
+                      scale={containerWidth ? undefined : (zoom / 100)}
+                      className="shadow-md rounded border border-slate-200 bg-white max-w-full"
                       renderAnnotationLayer={false}
                       renderTextLayer={true}
                     />
@@ -342,29 +374,31 @@ export default function FilePreview({
               </div>
             ) : (
               /* Word, Txt reader page sheet */
-              <div className="bg-[#171e30] border border-[#27334f]/50 rounded-3xl w-full max-w-[700px] p-6 sm:p-12 flex flex-col justify-between min-h-[500px] sm:min-h-[850px] shadow-2xl text-slate-200">
+              <div
+                className="bg-white shadow-xl border border-slate-200/40 rounded-3xl w-full max-w-[650px] p-5 sm:p-12 flex flex-col justify-between min-h-[500px] sm:min-h-[850px]"
+              >
                 <div>
-                  <div className="flex items-center gap-1.5 text-blue-400 text-xs font-bold uppercase tracking-wider mb-8">
-                    <span className="w-5 h-5 rounded-xs bg-blue-500 flex items-center justify-center text-white text-[9px] font-extrabold">
+                  <div className="flex items-center gap-1.5 text-blue-600 text-xs font-bold uppercase tracking-wider mb-8">
+                    <span className="w-5 h-5 rounded-xs bg-blue-600 flex items-center justify-center text-white text-[9px] font-extrabold">
                       AC
                     </span>
                     Acme Corp
                   </div>
 
-                  <div className="font-sans text-slate-250 text-left leading-relaxed whitespace-pre-line">
+                  <div className="font-sans text-slate-800 text-left leading-relaxed whitespace-pre-line">
                     {file?.fileContent?.content ? (
                       <div className="text-xs md:text-sm">
                         {currentPageContent}
                       </div>
                     ) : (
                       <div>
-                        <h1 className="text-2xl font-extrabold text-white tracking-tight mb-2">
+                        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
                           {getSafeFileName()}
                         </h1>
-                        <h3 className="text-sm font-semibold text-blue-400 mb-6">
+                        <h3 className="text-sm font-semibold text-blue-600 mb-6">
                           Extracted Document Preview
                         </h3>
-                        <p className="text-xs text-slate-400 leading-relaxed">
+                        <p className="text-xs text-slate-550 leading-relaxed">
                           This file does not contain extractable plain text. You
                           can download the file to view its full contents.
                         </p>
@@ -373,7 +407,7 @@ export default function FilePreview({
                   </div>
                 </div>
 
-                <div className="text-[10px] text-slate-500 border-t border-[#1e293b]/50 pt-4 text-center font-medium mt-8">
+                <div className="text-[10px] text-slate-400 border-t border-slate-100 pt-4 text-center font-medium mt-8">
                   Page {activePage} of {totalPages} • Acme Corp Confidential
                 </div>
               </div>
@@ -381,135 +415,252 @@ export default function FilePreview({
           </div>
 
           {/* Floating Controls Overlay */}
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#0f1422]/90 backdrop-blur-md border border-[#1e293b]/50 p-2 rounded-2xl flex items-center gap-3 shadow-xl z-20 max-w-[90%] justify-center text-white">
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xs border border-slate-200 p-2 sm:p-2.5 rounded-2xl flex items-center gap-3 sm:gap-4 shadow-lg z-10 max-w-[90%] justify-center">
             {mimeGroup !== "Image" && (
-              <div className="flex items-center gap-2 pr-3 border-r border-[#1e293b] text-xs text-slate-350 font-semibold select-none shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 pr-3 sm:pr-4 border-r border-slate-200 text-xs sm:text-sm text-slate-650 font-semibold select-none shrink-0">
                 <button
                   onClick={() => setActivePage(Math.max(1, activePage - 1))}
                   disabled={activePage === 1}
-                  className="p-1 hover:bg-[#1e293b] rounded-lg text-slate-300 disabled:opacity-30 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
+                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
                   title="Previous Page"
                 >
-                  <ChevronLeft size={15} />
+                  <ChevronLeft size={16} />
                 </button>
-                <span className="shrink-0 font-bold">
+                <span className="shrink-0">
                   {activePage} / {totalPages}
                 </span>
                 <button
-                  onClick={() =>
-                    setActivePage(Math.min(totalPages, activePage + 1))
-                  }
+                  onClick={() => setActivePage(Math.min(totalPages, activePage + 1))}
                   disabled={activePage === totalPages}
-                  className="p-1 hover:bg-[#1e293b] rounded-lg text-slate-300 disabled:opacity-30 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
+                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
                   title="Next Page"
                 >
-                  <ChevronRight size={15} />
+                  <ChevronRight size={16} />
                 </button>
               </div>
             )}
-
+            
             <button
               onClick={() => setZoom(Math.max(50, zoom - 10))}
-              className="p-1.5 hover:bg-[#1e293b] rounded-lg text-slate-300 border-none bg-transparent cursor-pointer flex items-center"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 border-none bg-transparent cursor-pointer flex items-center"
               title="Zoom Out"
             >
-              <ZoomOut size={15} />
+              <ZoomOut size={16} />
             </button>
             <button
               onClick={() => setZoom(Math.min(200, zoom + 10))}
-              className="p-1.5 hover:bg-[#1e293b] rounded-lg text-slate-300 border-none bg-transparent cursor-pointer flex items-center"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 border-none bg-transparent cursor-pointer flex items-center"
               title="Zoom In"
             >
-              <ZoomIn size={15} />
+              <ZoomIn size={16} />
             </button>
             <button
               onClick={() => setZoom(100)}
-              className="p-1.5 hover:bg-[#1e293b] rounded-lg text-slate-300 border-none bg-transparent cursor-pointer flex items-center"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 border-none bg-transparent cursor-pointer flex items-center"
               title="Fit Screen"
             >
-              <Maximize size={15} />
+              <Maximize size={16} />
             </button>
           </div>
         </div>
 
         {/* Right: Sidebar Details Panel */}
-        <div className="w-full lg:w-[320px] bg-[#0c101d] border-l border-[#1e293b]/50 p-6 shrink-0 self-stretch lg:overflow-y-auto flex flex-col gap-6 text-slate-300 z-10 shadow-xl">
-          <div>
-            <h3 className="text-[13px] font-bold text-slate-400 tracking-wider uppercase mb-3">
-              File details
-            </h3>
-
-            {/* File Card Info Top */}
-            <div className="flex items-center gap-3.5 p-3.5 bg-[#171e30] border border-[#27334f]/50 rounded-2xl mb-5">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#1e293b] text-blue-400 shrink-0">
-                {mimeGroup === "PDF" && <FileText size={18} />}
-                {mimeGroup === "Text" && <FileText size={18} />}
-                {mimeGroup === "Word" && <FileText size={18} />}
-                {mimeGroup === "Excel" && <FileSpreadsheet size={18} />}
-                {mimeGroup === "Image" && <ImageIcon size={18} />}
-                {mimeGroup === "Document" && <File size={18} />}
-              </div>
-              <div className="flex flex-col truncate">
-                <span className="text-[13.5px] font-bold text-white truncate" title={getSafeFileName()}>
-                  {getSafeFileName()}
-                </span>
-                <span className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                  {formatBytes(Number(file?.fileSize))}
-                </span>
-              </div>
+        <div className="w-full lg:w-[360px] bg-white border border-slate-100 rounded-3xl p-4 sm:p-5 shadow-xs shrink-0 self-stretch lg:overflow-y-auto flex flex-col">
+          {/* File Card info top */}
+          <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 rounded-2xl mb-5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                mimeGroup === "PDF" 
+                  ? "bg-red-50 text-red-600 border-red-100"
+                  : mimeGroup === "Excel"
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  : mimeGroup === "Word" || mimeGroup === "Text"
+                  ? "bg-blue-50 text-blue-600 border-blue-100"
+                  : "bg-cyan-50 text-cyan-600 border-cyan-100"
+              }`}
+            >
+              {mimeGroup === "PDF" && (
+                <FileText size={20} color="#DC2626" />
+              )}
+              {mimeGroup === "Text" && (
+                <FileText size={20} color="#2563EB" />
+              )}
+              {mimeGroup === "Word" && (
+                <FileText size={20} color="#2563EB" />
+              )}
+              {mimeGroup === "Excel" && (
+                <FileSpreadsheet size={20} className="text-emerald-500" />
+              )}
+              {mimeGroup === "Image" && (
+                <File size={20} className="text-slate-500" />
+              )}
             </div>
-
-            {/* Metadata Table */}
-            <div className="flex flex-col gap-4 border-b border-[#1e293b]/55 pb-5">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-400">Name</span>
-                <span className="text-slate-200 truncate max-w-[160px] text-right" title={getSafeFileName()}>
-                  {getSafeFileName()}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-400">Type</span>
-                <span className="text-slate-200 text-right">{mimeGroup} Document</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-400">Size</span>
-                <span className="text-slate-200 text-right">{formatBytes(Number(file?.fileSize))}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-400">Shared by</span>
-                <span className="text-slate-200 text-right truncate max-w-[160px]" title={file?.owner?.email || currentUser?.email || "john@mail.com"}>
-                  {file?.owner?.email || currentUser?.email || "john@mail.com"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-400">Shared on</span>
-                <span className="text-slate-200 text-right">{formatDateTime(file?.createdAt)}</span>
-              </div>
+            <div className="flex flex-col truncate">
+              <span
+                className="text-sm font-bold text-slate-800 truncate"
+                title={getSafeFileName()}
+              >
+                {getSafeFileName()}
+              </span>
+              <span className="text-xs text-slate-400 font-bold mt-0.5">
+                {formatBytes(Number(file?.fileSize))}
+              </span>
             </div>
           </div>
 
-          {/* Actions Panel */}
-          <div className="flex flex-col gap-3 mt-auto">
-            <h3 className="text-[13px] font-bold text-slate-400 tracking-wider uppercase mb-1">
-              Actions
-            </h3>
-            
+          {/* Tabs */}
+          <div className="flex border-b border-slate-100 mb-5 text-sm font-bold text-slate-400">
             <button
-              onClick={(e) => handleDownload(file, e)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#1e293b] hover:bg-[#2b394f] text-white border border-[#334155]/60 hover:border-slate-400/80 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer outline-none"
+              onClick={() => setActiveTab("details")}
+              className={`flex-1 pb-3 text-center cursor-pointer border-none bg-transparent outline-none
+                ${activeTab === "details" ? "text-[#c62828] border-b-2 border-[#c62828]" : "hover:text-slate-700"}
+              `}
             >
-              <Download size={14} />
-              <span>Download file</span>
+              Details
             </button>
-            
             <button
-              onClick={() => setZoom(100)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-transparent hover:bg-[#171e30] text-slate-350 border border-transparent rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer outline-none"
+              onClick={() => setActiveTab("activity")}
+              className={`flex-1 pb-3 text-center cursor-pointer border-none bg-transparent outline-none
+                ${activeTab === "activity" ? "text-[#c62828] border-b-2 border-[#c62828]" : "hover:text-slate-700"}
+              `}
             >
-              <Maximize size={14} />
-              <span>View full screen</span>
+              Activity
             </button>
           </div>
+
+          {activeTab === "details" ? (
+            <div className="flex flex-col gap-5 grow">
+              {/* Properties */}
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span className="text-slate-400">Type</span>
+                  <span className="text-slate-700">{mimeGroup} Document</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span className="text-slate-400">Size</span>
+                  <span className="text-slate-700">
+                    {formatBytes(Number(file?.fileSize))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span className="text-slate-400">Uploaded</span>
+                  <span className="text-slate-700">
+                    {formatDateTime(file?.createdAt)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span className="text-slate-400">Location</span>
+                  <span className="text-slate-700">My Files</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span className="text-slate-400">Owner</span>
+                  <div className="flex items-center gap-1.5 text-slate-700">
+                    <div className="w-5.5 h-5.5 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                      <User size={13} />
+                    </div>
+                    <span>
+                      {file?.owner
+                        ? `${file.owner.firstName} ${file.owner.lastName}`
+                        : currentUser
+                          ? `${currentUser.firstName} ${currentUser.lastName}`
+                          : "Alex Johnson"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sharing */}
+              <div className="flex flex-col gap-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-bold text-slate-800">
+                    Sharing
+                  </span>
+                </div>
+
+                <div className="text-[13px] font-semibold text-slate-400">
+                  Shared with {file?.shares ? file.shares.length : 0} people
+                </div>
+
+                <div className="flex flex-col gap-4 max-h-56 overflow-y-auto">
+                  {file?.shares && file.shares.length > 0 ? (
+                    file.shares.map((p, i) => {
+                      const isExpired = new Date(p.expiresAt) < new Date();
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-3 text-sm font-semibold border-b border-slate-50 pb-3 last:border-none last:pb-0"
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <div className="w-7.5 h-7.5 rounded-full border border-slate-200/60 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                              <User size={15} />
+                            </div>
+                            <div className="flex flex-col truncate">
+                              <span className="text-slate-800 text-[13.5px] font-semibold truncate" title={p.recipientEmail}>
+                                {p.recipientEmail}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                {isExpired 
+                                  ? `Expired ${formatDateTime(p.expiresAt)}` 
+                                  : `Expires ${formatDateTime(p.expiresAt)}`}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 select-none">
+                            {/* Active/Expired badge */}
+                            <span
+                              className={
+                                isExpired
+                                  ? "text-slate-500 bg-slate-100 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                  : "text-emerald-700 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                              }
+                            >
+                              {isExpired ? "Expired" : "Active"}
+                            </span>
+                            {/* Viewed/Pending badge */}
+                            {!isExpired && (
+                              <span
+                                className={
+                                  p.openedAt
+                                    ? "text-blue-600 bg-blue-50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                    : "text-amber-600 bg-amber-50/50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                }
+                              >
+                                {p.openedAt ? "Viewed" : "Pending"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-slate-400 italic">
+                      Not shared with anyone yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Activity timeline list */
+            <div className="flex flex-col gap-4 grow">
+              <span className="text-sm font-bold text-slate-800">
+                Activity Timeline
+              </span>
+              <div className="flex flex-col gap-5 relative border-l border-slate-100 pl-4 ml-1">
+                {activityList.map((act, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-1 relative text-xs font-semibold"
+                  >
+                    <span className="absolute -left-[21px] top-1 w-2 h-2 rounded-full border-2 border-white bg-blue-500 shadow-xs" />
+                    <span className="text-slate-700">{act.desc}</span>
+                    <span className="text-slate-400 text-xs">
+                      {act.date}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
