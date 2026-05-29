@@ -113,7 +113,9 @@ const normalizeUploadError = (err) => {
 const isPrematureCloseError = (err) =>
   err?.code === "ERR_STREAM_PREMATURE_CLOSE" ||
   err?.code === "ECONNRESET" ||
-  String(err?.message || "").toLowerCase().includes("premature close");
+  String(err?.message || "")
+    .toLowerCase()
+    .includes("premature close");
 
 const streamDownload = async (res, file, inline = false) => {
   const disposition = inline ? "inline" : "attachment";

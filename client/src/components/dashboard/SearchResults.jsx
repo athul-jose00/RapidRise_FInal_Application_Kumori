@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FileText,
   FileSpreadsheet,
@@ -24,6 +24,9 @@ export default function SearchResults({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [activeTypeFilter, setActiveTypeFilter] = useState("all");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const filtersMenuRef = useRef(null);
   const { accessToken } = useSelector((state) => state.user);
 
   useEffect(() => {
@@ -51,6 +54,20 @@ export default function SearchResults({
 
     return () => clearTimeout(delayDebounce);
   }, [query]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        filtersMenuRef.current &&
+        !filtersMenuRef.current.contains(event.target)
+      ) {
+        setIsFiltersOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   // File type icon resolver
   const getFileIcon = (mimeType, fileName = "") => {
@@ -164,9 +181,75 @@ export default function SearchResults({
     );
   };
 
-  const images = results.filter(isImageFile);
-  const docFiles = results.filter((f) => !isImageFile(f));
-  const contentMatches = results.filter((f) =>
+  const getFileCategory = (file) => {
+    const mime = (file.mimeType || "").toLowerCase();
+    const name = (file.originalFileName || "").toLowerCase();
+
+    if (mime.includes("pdf") || name.endsWith(".pdf")) return "pdf";
+    if (
+      mime.includes("word") ||
+      mime.includes("officedocument.wordprocessingml") ||
+      name.endsWith(".doc") ||
+      name.endsWith(".docx")
+    ) {
+      return "document";
+    }
+    if (
+      mime.includes("excel") ||
+      mime.includes("officedocument.spreadsheetml") ||
+      name.endsWith(".xls") ||
+      name.endsWith(".xlsx")
+    ) {
+      return "spreadsheet";
+    }
+    if (
+      mime.includes("image/") ||
+      name.endsWith(".png") ||
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg") ||
+      name.endsWith(".gif") ||
+      name.endsWith(".webp")
+    ) {
+      return "image";
+    }
+    if (
+      mime.includes("video/") ||
+      name.endsWith(".mp4") ||
+      name.endsWith(".mkv") ||
+      name.endsWith(".mov") ||
+      name.endsWith(".avi")
+    ) {
+      return "video";
+    }
+    if (
+      mime.includes("zip") ||
+      mime.includes("tar") ||
+      mime.includes("rar") ||
+      name.endsWith(".zip") ||
+      name.endsWith(".rar") ||
+      name.endsWith(".7z")
+    ) {
+      return "archive";
+    }
+    if (mime.includes("text/") || name.endsWith(".txt")) return "text";
+    if (
+      mime.includes("audio/") ||
+      name.endsWith(".mp3") ||
+      name.endsWith(".wav")
+    )
+      return "audio";
+    return "other";
+  };
+
+  const matchesTypeFilter = (file) => {
+    if (activeTypeFilter === "all") return true;
+    return getFileCategory(file) === activeTypeFilter;
+  };
+
+  const typeFilteredResults = results.filter(matchesTypeFilter);
+  const images = typeFilteredResults.filter(isImageFile);
+  const docFiles = typeFilteredResults.filter((f) => !isImageFile(f));
+  const contentMatches = typeFilteredResults.filter((f) =>
     f.matches?.some((m) => m.type === "content"),
   );
 
@@ -178,12 +261,16 @@ export default function SearchResults({
   };
 
   const currentDisplayResults = filteredResults();
+  const noResultsForFilter =
+    results.length > 0 && typeFilteredResults.length === 0;
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-100">
         <div className="w-10 h-10 border-4 border-slate-200 border-t-[#c62828] rounded-full animate-spin mb-4" />
-        <p className="text-sm font-semibold text-slate-500">Searching your workspace...</p>
+        <p className="text-sm font-semibold text-slate-500">
+          Searching your workspace...
+        </p>
       </div>
     );
   }
@@ -196,7 +283,8 @@ export default function SearchResults({
           Search results for &ldquo;{query}&rdquo;
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          {results.length} results found across your files (including content inside files)
+          {results.length} results found across your files (including content
+          inside files)
         </p>
       </div>
 
@@ -253,11 +341,58 @@ export default function SearchResults({
           </button>
         </div>
 
-        <button className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1.5 outline-none">
-          <Filter size={13} />
-          <span>Filters</span>
-          <ChevronDown size={12} className="text-slate-400" />
-        </button>
+        <div className="relative" ref={filtersMenuRef}>
+          <button
+            onClick={() => setIsFiltersOpen((value) => !value)}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1.5 outline-none"
+          >
+            <Filter size={13} />
+            <span>Filters</span>
+            <ChevronDown size={12} className="text-slate-400" />
+          </button>
+
+          {isFiltersOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-lg z-20 p-2">
+              {[
+                { label: "All file types", value: "all" },
+                { label: "PDFs", value: "pdf" },
+                { label: "Documents", value: "document" },
+                { label: "Spreadsheets", value: "spreadsheet" },
+                { label: "Images", value: "image" },
+                { label: "Videos", value: "video" },
+                { label: "Audio", value: "audio" },
+                { label: "Archives", value: "archive" },
+                { label: "Text files", value: "text" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setActiveTypeFilter(option.value);
+                    setActiveFilter("all");
+                    setIsFiltersOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    activeTypeFilter === option.value
+                      ? "bg-red-50 text-[#c62828]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setActiveTypeFilter("all");
+                  setActiveFilter("all");
+                  setIsFiltersOpen(false);
+                }}
+                className="w-full mt-1 px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 cursor-pointer"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {results.length === 0 ? (
@@ -265,213 +400,250 @@ export default function SearchResults({
           <div className="w-14 h-14 bg-slate-50 text-slate-350 rounded-full flex items-center justify-center mb-4">
             <File size={26} />
           </div>
-          <h3 className="text-base font-bold text-slate-800 mb-1">No results found</h3>
+          <h3 className="text-base font-bold text-slate-800 mb-1">
+            No results found
+          </h3>
           <p className="text-xs text-slate-400 max-w-sm text-center">
-            We couldn&rsquo;t find anything matching &ldquo;{query}&rdquo;. Make sure everything is spelled correctly or try using other keywords.
+            We couldn&rsquo;t find anything matching &ldquo;{query}&rdquo;. Make
+            sure everything is spelled correctly or try using other keywords.
+          </p>
+        </div>
+      ) : noResultsForFilter ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-450 border border-slate-100 rounded-3xl">
+          <div className="w-14 h-14 bg-slate-50 text-slate-350 rounded-full flex items-center justify-center mb-4">
+            <Filter size={24} />
+          </div>
+          <h3 className="text-base font-bold text-slate-800 mb-1">
+            No results for this filter
+          </h3>
+          <p className="text-xs text-slate-400 max-w-sm text-center">
+            Try a different file type filter or clear the filters to see all
+            search results again.
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-8">
           {/* Images Section */}
-          {(activeFilter === "all" || activeFilter === "images") && images.length > 0 && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Images ({images.length})
-                </h3>
-                {activeFilter === "all" && (
-                  <button
-                    onClick={() => setActiveFilter("images")}
-                    className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
-                  >
-                    View all images
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
-                {images.slice(0, activeFilter === "all" ? 4 : undefined).map((img) => {
-                  const url = img?.cloudinaryUrl?.startsWith("http") 
-                    ? img.cloudinaryUrl 
-                    : `${API_ROOT}/api/files/${img.id}/download?token=${accessToken}`;
-                  return (
-                    <div
-                      key={img.id}
-                      onClick={() => onFileClick(img)}
-                      className="bg-slate-50/50 border border-slate-100 rounded-2xl p-3 cursor-pointer hover:shadow-md transition-shadow group flex flex-col"
+          {(activeFilter === "all" || activeFilter === "images") &&
+            images.length > 0 && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Images ({images.length})
+                  </h3>
+                  {activeFilter === "all" && (
+                    <button
+                      onClick={() => setActiveFilter("images")}
+                      className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
                     >
-                      <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 relative mb-3">
-                        <img
-                          src={url}
-                          alt={img.originalFileName}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <div className="absolute top-2 left-2 w-7 h-7 rounded-lg bg-black/40 backdrop-blur-xs flex items-center justify-center text-white">
-                          <ImageIcon size={14} />
+                      View all images
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+                  {images
+                    .slice(0, activeFilter === "all" ? 4 : undefined)
+                    .map((img) => {
+                      const url = img?.cloudinaryUrl?.startsWith("http")
+                        ? img.cloudinaryUrl
+                        : `${API_ROOT}/api/files/${img.id}/download?token=${accessToken}`;
+                      return (
+                        <div
+                          key={img.id}
+                          onClick={() => onFileClick(img)}
+                          className="bg-slate-50/50 border border-slate-100 rounded-2xl p-3 cursor-pointer hover:shadow-md transition-shadow group flex flex-col"
+                        >
+                          <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 relative mb-3">
+                            <img
+                              src={url}
+                              alt={img.originalFileName}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute top-2 left-2 w-7 h-7 rounded-lg bg-black/40 backdrop-blur-xs flex items-center justify-center text-white">
+                              <ImageIcon size={14} />
+                            </div>
+                          </div>
+                          <div className="flex flex-col text-left">
+                            <span
+                              className="text-xs font-bold text-slate-800 truncate"
+                              title={img.originalFileName}
+                            >
+                              {img.originalFileName}
+                            </span>
+                            <div className="flex justify-between items-center text-[10px] text-slate-450 font-bold mt-1">
+                              <span>
+                                {formatBytes(img.fileSize)} &bull;{" "}
+                                {img.mimeType?.split("/")[1]?.toUpperCase() ||
+                                  "IMG"}
+                              </span>
+                              <span>{formatTimeAgo(img.createdAt)}</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-col text-left">
-                        <span className="text-xs font-bold text-slate-800 truncate" title={img.originalFileName}>
-                          {img.originalFileName}
-                        </span>
-                        <div className="flex justify-between items-center text-[10px] text-slate-450 font-bold mt-1">
-                          <span>
-                            {formatBytes(img.fileSize)} &bull; {img.mimeType?.split("/")[1]?.toUpperCase() || "IMG"}
-                          </span>
-                          <span>{formatTimeAgo(img.createdAt)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Files Section */}
-          {(activeFilter === "all" || activeFilter === "files") && docFiles.length > 0 && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Files ({docFiles.length})
-                </h3>
-                {activeFilter === "all" && (
-                  <button
-                    onClick={() => setActiveFilter("files")}
-                    className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
-                  >
-                    View all files
-                  </button>
-                )}
-              </div>
-              <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-100 text-[11px] font-bold text-slate-450 uppercase tracking-wider">
-                      <th className="py-3 px-5">Name</th>
-                      <th className="py-3 px-4">Matched in</th>
-                      <th className="py-3 px-4 w-[50%]">Snippet</th>
-                      <th className="py-3 px-4">Modified</th>
-                      <th className="py-3 px-4 w-10 text-center"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-650">
-                    {docFiles
-                      .slice(0, activeFilter === "all" ? 5 : undefined)
-                      .map((item) => {
-                        const firstMatch = item.matches?.[0];
-                        const matchInLabel =
-                          firstMatch?.type === "fileName"
-                            ? "Filename"
-                            : firstMatch?.type === "content"
-                              ? `Page ${firstMatch.pageNumber || 1}`
-                              : firstMatch?.type === "caption"
-                                ? "Caption"
-                                : firstMatch?.type === "label"
-                                  ? "Tag"
-                                  : "Content";
-
-                        const snippet =
-                          firstMatch?.type === "content"
-                            ? firstMatch.context
-                            : firstMatch?.type === "caption"
-                              ? firstMatch.context
-                              : item.originalFileName;
-
-                        return (
-                          <tr
-                            key={item.id}
-                            onClick={() => onFileClick(item)}
-                            className="hover:bg-slate-50/40 transition-colors cursor-pointer"
-                          >
-                            <td className="py-3.5 px-5">
-                              <div className="flex items-center gap-3 font-semibold text-slate-800">
-                                {getFileIcon(item.mimeType, item.originalFileName)}
-                                <span className="truncate max-w-[200px] text-[13px] font-semibold">
-                                  {item.originalFileName}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 font-bold text-slate-450">
-                              {matchInLabel}
-                            </td>
-                            <td className="py-3.5 px-4 text-slate-500 italic max-w-xs truncate font-medium">
-                              &ldquo;{highlightText(snippet, query)}&rdquo;
-                            </td>
-                            <td className="py-3.5 px-4 text-slate-450">
-                              {formatTimeAgo(item.createdAt)}
-                            </td>
-                            <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                              <button className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 border-none bg-transparent cursor-pointer">
-                                <MoreHorizontal size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-                {activeFilter === "all" && docFiles.length > 5 && (
-                  <div className="p-3 text-center border-t border-slate-100">
+          {(activeFilter === "all" || activeFilter === "files") &&
+            docFiles.length > 0 && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Files ({docFiles.length})
+                  </h3>
+                  {activeFilter === "all" && (
                     <button
                       onClick={() => setActiveFilter("files")}
-                      className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer"
+                      className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
                     >
-                      + {docFiles.length - 5} more files
+                      View all files
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-100 text-[11px] font-bold text-slate-450 uppercase tracking-wider">
+                        <th className="py-3 px-5">Name</th>
+                        <th className="py-3 px-4">Matched in</th>
+                        <th className="py-3 px-4 w-[50%]">Snippet</th>
+                        <th className="py-3 px-4">Modified</th>
+                        <th className="py-3 px-4 w-10 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-650">
+                      {docFiles
+                        .slice(0, activeFilter === "all" ? 5 : undefined)
+                        .map((item) => {
+                          const firstMatch = item.matches?.[0];
+                          const matchInLabel =
+                            firstMatch?.type === "fileName"
+                              ? "Filename"
+                              : firstMatch?.type === "content"
+                                ? `Page ${firstMatch.pageNumber || 1}`
+                                : firstMatch?.type === "caption"
+                                  ? "Caption"
+                                  : firstMatch?.type === "label"
+                                    ? "Tag"
+                                    : "Content";
+
+                          const snippet =
+                            firstMatch?.type === "content"
+                              ? firstMatch.context
+                              : firstMatch?.type === "caption"
+                                ? firstMatch.context
+                                : item.originalFileName;
+
+                          return (
+                            <tr
+                              key={item.id}
+                              onClick={() => onFileClick(item)}
+                              className="hover:bg-slate-50/40 transition-colors cursor-pointer"
+                            >
+                              <td className="py-3.5 px-5">
+                                <div className="flex items-center gap-3 font-semibold text-slate-800">
+                                  {getFileIcon(
+                                    item.mimeType,
+                                    item.originalFileName,
+                                  )}
+                                  <span className="truncate max-w-[200px] text-[13px] font-semibold">
+                                    {item.originalFileName}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 font-bold text-slate-450">
+                                {matchInLabel}
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-500 italic max-w-xs truncate font-medium">
+                                &ldquo;{highlightText(snippet, query)}&rdquo;
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-450">
+                                {formatTimeAgo(item.createdAt)}
+                              </td>
+                              <td
+                                className="py-3.5 px-4 text-center"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 border-none bg-transparent cursor-pointer">
+                                  <MoreHorizontal size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                  {activeFilter === "all" && docFiles.length > 5 && (
+                    <div className="p-3 text-center border-t border-slate-100">
+                      <button
+                        onClick={() => setActiveFilter("files")}
+                        className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer"
+                      >
+                        + {docFiles.length - 5} more files
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Content Matches Section */}
-          {(activeFilter === "all" || activeFilter === "content") && contentMatches.length > 0 && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Content matches (from inside files) ({contentMatches.length})
-                </h3>
-                {activeFilter === "all" && (
-                  <button
-                    onClick={() => setActiveFilter("content")}
-                    className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
-                  >
-                    View all content matches
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-col gap-3">
-                {contentMatches
-                  .slice(0, activeFilter === "all" ? 3 : undefined)
-                  .map((item) => {
-                    const cMatch = item.matches?.find((m) => m.type === "content");
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => onFileClick(item)}
-                        className="flex flex-col p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:shadow-xs cursor-pointer text-left"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          {getFileIcon(item.mimeType, item.originalFileName)}
-                          <span className="text-xs font-bold text-slate-850 truncate max-w-sm">
-                            {item.originalFileName}
-                          </span>
-                          <span className="text-[10px] bg-slate-200/60 text-slate-550 px-1.5 py-0.5 rounded-sm font-bold ml-1">
-                            Page {cMatch?.pageNumber || 1} &bull; Section: {cMatch?.sectionName || "Body"}
+          {(activeFilter === "all" || activeFilter === "content") &&
+            contentMatches.length > 0 && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Content matches (from inside files) ({contentMatches.length}
+                    )
+                  </h3>
+                  {activeFilter === "all" && (
+                    <button
+                      onClick={() => setActiveFilter("content")}
+                      className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer p-0"
+                    >
+                      View all content matches
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-3">
+                  {contentMatches
+                    .slice(0, activeFilter === "all" ? 3 : undefined)
+                    .map((item) => {
+                      const cMatch = item.matches?.find(
+                        (m) => m.type === "content",
+                      );
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => onFileClick(item)}
+                          className="flex flex-col p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:shadow-xs cursor-pointer text-left"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            {getFileIcon(item.mimeType, item.originalFileName)}
+                            <span className="text-xs font-bold text-slate-850 truncate max-w-sm">
+                              {item.originalFileName}
+                            </span>
+                            <span className="text-[10px] bg-slate-200/60 text-slate-550 px-1.5 py-0.5 rounded-sm font-bold ml-1">
+                              Page {cMatch?.pageNumber || 1} &bull; Section:{" "}
+                              {cMatch?.sectionName || "Body"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 leading-relaxed italic ml-11 font-medium">
+                            &ldquo;{highlightText(cMatch?.context || "", query)}
+                            &rdquo;
+                          </p>
+                          <span className="text-[10px] text-slate-400 font-bold ml-11 mt-1">
+                            Modified {formatTimeAgo(item.createdAt)}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 leading-relaxed italic ml-11 font-medium">
-                          &ldquo;{highlightText(cMatch?.context || "", query)}&rdquo;
-                        </p>
-                        <span className="text-[10px] text-slate-400 font-bold ml-11 mt-1">
-                          Modified {formatTimeAgo(item.createdAt)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Semantic & Context Search Explanation Card */}
           <div className="bg-red-50/10 border border-red-100 rounded-3xl p-6 flex items-start gap-4 text-left mt-2">
@@ -479,14 +651,19 @@ export default function SearchResults({
               <Sparkles size={20} />
             </div>
             <div className="flex flex-col">
-              <h4 className="text-sm font-bold text-slate-800">Semantic & context search</h4>
+              <h4 className="text-sm font-bold text-slate-800">
+                Semantic & context search
+              </h4>
               <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                Kumori understands the meaning behind your search and finds relevant content, even if exact words don&rsquo;t match.{" "}
+                Kumori understands the meaning behind your search and finds
+                relevant content, even if exact words don&rsquo;t match.{" "}
                 <a
                   href="#semantic-help"
                   onClick={(e) => {
                     e.preventDefault();
-                    toast.info("Kumori uses OpenAI vector embeddings for semantic intelligence.");
+                    toast.info(
+                      "Kumori uses OpenAI vector embeddings for semantic intelligence.",
+                    );
                   }}
                   className="text-[#c62828] font-bold hover:underline"
                 >

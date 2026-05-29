@@ -8,9 +8,9 @@ const router = express.Router();
 const isPrematureCloseError = (err) =>
   err?.code === "ERR_STREAM_PREMATURE_CLOSE" ||
   err?.code === "ECONNRESET" ||
-  String(err?.message || "").toLowerCase().includes("premature close");
-
-
+  String(err?.message || "")
+    .toLowerCase()
+    .includes("premature close");
 
 // Public access: view share info
 router.get("/share/:token", publicShare);
@@ -24,7 +24,9 @@ router.get("/share/:token/download", async (req, res) => {
     if (!share)
       return res.status(404).json({ message: "Invalid or expired link" });
     if (share.revokedAt)
-      return res.status(410).json({ message: "This share link has been revoked" });
+      return res
+        .status(410)
+        .json({ message: "This share link has been revoked" });
     if (share.expiresAt < new Date())
       return res.status(410).json({ message: "Link expired" });
 

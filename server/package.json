@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
+    "build": "prisma generate --schema=prisma/schema.prisma",
     "start": "node src/server.js",
     "dev": "nodemon --watch src --exec node src/server.js",
     "backfill:embeddings": "node scripts/backfill-semantic-embeddings.js",

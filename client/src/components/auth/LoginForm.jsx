@@ -20,7 +20,7 @@ function AuthField({ id, label, icon: Icon, children }) {
   );
 }
 
-export default function LoginForm({ onToggle, onNavigate, isVisible }) {
+export default function LoginForm({ onToggle, onNavigate, isVisible, onForgotPasswordClick, useDelay = true }) {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -66,7 +66,7 @@ export default function LoginForm({ onToggle, onNavigate, isVisible }) {
       onSubmit={handleLoginSubmit}
       className={`auth-form flex flex-col items-center justify-center gap-3.5 p-16 col-start-1 col-end-2 row-start-1 row-end-2 w-full max-w-lg mx-auto rounded-[1.8rem] border border-slate-100/50 bg-white/90 shadow-2xl backdrop-blur-md max-lg:bg-white max-lg:shadow-xl max-lg:border-slate-100 max-lg:p-10 max-sm:p-6 max-sm:gap-3
         ${isVisible 
-          ? "z-[5] opacity-100 pointer-events-auto translate-x-0 transition-all duration-[400ms] delay-[800ms] ease-in-out max-lg:transition-none" 
+          ? `z-[5] opacity-100 pointer-events-auto translate-x-0 transition-all duration-[400ms] ${useDelay ? "delay-[800ms]" : ""} ease-in-out max-lg:transition-none` 
           : "z-[1] opacity-0 pointer-events-none -translate-x-[80px] max-lg:translate-x-0"
         }
       `}
@@ -112,6 +112,16 @@ export default function LoginForm({ onToggle, onNavigate, isVisible }) {
           {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </AuthField>
+
+      <div className="w-full flex justify-end -mt-1.5 px-1.5">
+        <button
+          type="button"
+          onClick={onForgotPasswordClick}
+          className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] bg-transparent border-none cursor-pointer outline-none hover:underline"
+        >
+          Forgot password?
+        </button>
+      </div>
 
       <button 
         type="submit" 

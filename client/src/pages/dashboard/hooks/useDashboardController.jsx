@@ -170,33 +170,12 @@ export default function useDashboardController() {
 
   const handleDownload = async (file, e) => {
     e.stopPropagation();
-    const toastId = toast.info(`Preparing download for ${file.originalFileName}...`);
+    const toastId = toast.info(
+      `Preparing download for ${file.originalFileName}...`,
+    );
     try {
-      const response = await api.get(`/api/files/${file.id}/download`, {
-        responseType: "blob",
-      });
-      const disposition = response.headers?.["content-disposition"] || "";
-      const match = disposition.match(/filename="?([^";]+)"?/i);
-      const filename = match?.[1] || file.originalFileName;
-      const blob = new Blob([response.data], {
-        type: response.data.type || file.mimeType || "application/octet-stream",
-      });
-
-      if (window.showSaveFilePicker) {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: filename,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        toast.dismiss(toastId);
-        toast.success("Download started!");
-        return;
-      }
-
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      const downloadUrl = `${api.defaults.baseURL || "http://localhost:3000"}/api/files/${file.id}/download${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`;
+      window.location.assign(downloadUrl);
       toast.dismiss(toastId);
       toast.success("Download started!");
     } catch {
@@ -265,7 +244,7 @@ export default function useDashboardController() {
 
   const handleShareSubmit = async (e, emailsList) => {
     if (e) e.preventDefault();
-    
+
     const emailsToShare = emailsList || (shareEmail ? [shareEmail] : []);
     if (emailsToShare.length === 0) {
       toast.error("Please enter or add at least one recipient email");
@@ -287,7 +266,9 @@ export default function useDashboardController() {
       const shares = actionResult.shares || [];
       if (shares.length > 0) {
         setShareLinkSuccess(shares);
-        toast.success(`File successfully shared with ${shares.length} recipient(s)!`);
+        toast.success(
+          `File successfully shared with ${shares.length} recipient(s)!`,
+        );
         void refreshSharesCount();
       } else {
         toast.error("Successfully shared, but could not retrieve share link");

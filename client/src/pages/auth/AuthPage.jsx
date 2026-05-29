@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import LoginForm from "../../components/auth/LoginForm";
 import RegisterForm from "../../components/auth/RegisterForm";
+import ForgotPasswordForm from "../../components/auth/ForgotPasswordForm";
 
 function AuthPanelArt({ variant, isSignUpMode }) {
   const commonClasses = "w-full max-w-[35rem] transition-transform duration-[1100ms] delay-[400ms] ease-in-out object-contain drop-shadow-[0_20px_45px_rgba(0,0,0,0.25)]";
@@ -26,9 +27,13 @@ function AuthPanelArt({ variant, isSignUpMode }) {
 
 export default function AuthPage({ onNavigate, initialMode = "login" }) {
   const [isSignUpMode, setIsSignUpMode] = useState(initialMode === "register");
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
+  const [useDelay, setUseDelay] = useState(true);
 
   useEffect(() => {
     setIsSignUpMode(initialMode === "register");
+    setIsForgotPasswordMode(false);
+    setUseDelay(true);
   }, [initialMode]);
 
   return (
@@ -48,14 +53,34 @@ export default function AuthPage({ onNavigate, initialMode = "login" }) {
           `}
         >
           <LoginForm 
-            isVisible={!isSignUpMode} 
-            onToggle={() => setIsSignUpMode(true)} 
+            isVisible={!isSignUpMode && !isForgotPasswordMode} 
+            onToggle={() => {
+              setIsSignUpMode(true);
+              setIsForgotPasswordMode(false);
+              setUseDelay(true);
+            }} 
             onNavigate={onNavigate} 
+            onForgotPasswordClick={() => {
+              setIsForgotPasswordMode(true);
+              setUseDelay(false);
+            }}
+            useDelay={useDelay}
           />
           <RegisterForm 
-            isVisible={isSignUpMode} 
-            onToggle={() => setIsSignUpMode(false)} 
+            isVisible={isSignUpMode && !isForgotPasswordMode} 
+            onToggle={() => {
+              setIsSignUpMode(false);
+              setIsForgotPasswordMode(false);
+              setUseDelay(true);
+            }} 
             onNavigate={onNavigate} 
+          />
+          <ForgotPasswordForm
+            isVisible={isForgotPasswordMode}
+            onBackToLogin={() => {
+              setIsForgotPasswordMode(false);
+              setUseDelay(false);
+            }}
           />
         </div>
       </div>
@@ -73,7 +98,11 @@ export default function AuthPage({ onNavigate, initialMode = "login" }) {
             <button 
               type="button" 
               className="w-[8.2rem] h-[2.6rem] border-2 border-white bg-transparent text-white font-bold uppercase tracking-wider text-[11px] rounded-full hover:bg-white/10 active:scale-95 cursor-pointer transition-all duration-200 block mx-auto" 
-              onClick={() => setIsSignUpMode(true)}
+              onClick={() => {
+                setIsSignUpMode(true);
+                setIsForgotPasswordMode(false);
+                setUseDelay(true);
+              }}
             >
               Sign up
             </button>
@@ -91,7 +120,11 @@ export default function AuthPage({ onNavigate, initialMode = "login" }) {
             <button 
               type="button" 
               className="w-[8.2rem] h-[2.6rem] border-2 border-white bg-transparent text-white font-bold uppercase tracking-wider text-[11px] rounded-full hover:bg-white/10 active:scale-95 cursor-pointer transition-all duration-200 block mx-auto" 
-              onClick={() => setIsSignUpMode(false)}
+              onClick={() => {
+                setIsSignUpMode(false);
+                setIsForgotPasswordMode(false);
+                setUseDelay(true);
+              }}
             >
               Sign in
             </button>

@@ -25,7 +25,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 // Configure PDFJS Worker using local Vite resolution
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
+  import.meta.url,
 ).toString();
 
 export default function SharedFileView({ token }) {
@@ -171,48 +171,17 @@ export default function SharedFileView({ token }) {
 
   const handleDownload = () => {
     if (!token) return;
-    toast.info("Preparing download...");
-    axios
-      .get(`${API_ROOT}/public/share/${token}/download`, {
-        responseType: "blob",
-      })
-      .then((res) => {
-        const disposition = res.headers?.["content-disposition"] || "";
-        const match = disposition.match(/filename="?([^";]+)"?/i);
-        const filename = match?.[1] || getSafeFileName();
-        const blob = new Blob([res.data], {
-          type: res.data.type || file?.mimeType || "application/octet-stream",
-        });
-
-        if (window.showSaveFilePicker) {
-          window
-            .showSaveFilePicker({
-              suggestedName: filename,
-            })
-            .then((handle) => handle.createWritable())
-            .then(async (writable) => {
-              await writable.write(blob);
-              await writable.close();
-              toast.success("Download started!");
-            })
-            .catch((pickerError) => {
-              if (pickerError?.name !== "AbortError") {
-                console.error("Save picker failed:", pickerError);
-                toast.error("Download failed. Please try again.");
-              }
-            });
-          return;
-        }
-
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener,noreferrer");
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-        toast.success("Download started!");
-      })
-      .catch((err) => {
-        console.error("Download failed:", err);
-        toast.error("Download failed. Please try again.");
-      });
+    const toastId = toast.info("Preparing download...");
+    try {
+      const downloadUrl = `${API_ROOT}/public/share/${token}/download`;
+      window.location.assign(downloadUrl);
+      toast.dismiss(toastId);
+      toast.success("Download started!");
+    } catch (err) {
+      console.error("Download failed:", err);
+      toast.dismiss(toastId);
+      toast.error("Download failed. Please try again.");
+    }
   };
 
   // Render file group type icon helper
@@ -237,7 +206,9 @@ export default function SharedFileView({ token }) {
       <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-[#c62828] animate-spin" />
-          <h2 className="text-slate-650 font-bold text-base">Retrieving secure shared file...</h2>
+          <h2 className="text-slate-650 font-bold text-base">
+            Retrieving secure shared file...
+          </h2>
         </div>
       </div>
     );
@@ -248,14 +219,17 @@ export default function SharedFileView({ token }) {
     const isExpired = error.toLowerCase().includes("expired");
 
     let title = "Invalid Link";
-    let description = "This share link is invalid. Please verify you copied the link correctly.";
+    let description =
+      "This share link is invalid. Please verify you copied the link correctly.";
 
     if (isRevoked) {
       title = "Link Revoked";
-      description = "This secure share link has been revoked by the owner. Please request a new link if you still need access.";
+      description =
+        "This secure share link has been revoked by the owner. Please request a new link if you still need access.";
     } else if (isExpired) {
       title = "Link Expired";
-      description = "This secure share link has expired. Please contact the file owner to request a new link.";
+      description =
+        "This secure share link has expired. Please contact the file owner to request a new link.";
     }
 
     return (
@@ -306,8 +280,7 @@ export default function SharedFileView({ token }) {
       </header>
 
       {/* 2. Main Container */}
-      <main className="flex-1 w-full max-w-[1340px] mx-auto px-6 py-6 flex flex-col gap-6">
-        
+      <main className="flex-1 w-full max-w-[1536px] mx-auto px-6 py-6 flex flex-col gap-6">
         {/* Top Expiring Banner */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-3xl shadow-xs gap-4 shrink-0">
           <div className="flex items-center gap-4">
@@ -319,8 +292,8 @@ export default function SharedFileView({ token }) {
                 A file has been shared with you
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                You can view and download the file below. This link will expire in{" "}
-                {timeLeft || "soon"}.
+                You can view and download the file below. This link will expire
+                in {timeLeft || "soon"}.
               </p>
             </div>
           </div>
@@ -338,8 +311,7 @@ export default function SharedFileView({ token }) {
         </div>
 
         {/* Inner layout split */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
-          
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
           {/* Left panel: File viewer */}
           <div className="bg-white/60 backdrop-blur-md border border-slate-200/40 rounded-3xl shadow-xs overflow-hidden flex flex-col self-stretch min-h-[600px] lg:min-h-0">
             {/* Toolbar */}
@@ -384,7 +356,9 @@ export default function SharedFileView({ token }) {
                     {activePage} / {numPages}
                   </span>
                   <button
-                    onClick={() => setActivePage(Math.min(numPages, activePage + 1))}
+                    onClick={() =>
+                      setActivePage(Math.min(numPages, activePage + 1))
+                    }
                     disabled={activePage === numPages}
                     className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-600 border border-slate-200 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer flex items-center transition-colors"
                   >
@@ -402,7 +376,9 @@ export default function SharedFileView({ token }) {
                   >
                     <ZoomOut size={13} />
                   </button>
-                  <span className="font-semibold min-w-8 text-center">{zoom}%</span>
+                  <span className="font-semibold min-w-8 text-center">
+                    {zoom}%
+                  </span>
                   <button
                     onClick={() => setZoom(Math.min(200, zoom + 10))}
                     className="hover:bg-slate-50 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
@@ -427,7 +403,9 @@ export default function SharedFileView({ token }) {
                 <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-50/50 z-10">
                   <div className="flex flex-col items-center gap-3 text-center">
                     <div className="w-8 h-8 rounded-full border-3 border-slate-200 border-t-[#c62828] animate-spin" />
-                    <span className="text-slate-550 font-semibold">Loading PDF preview...</span>
+                    <span className="text-slate-550 font-semibold">
+                      Loading PDF preview...
+                    </span>
                   </div>
                 </div>
               )}
@@ -449,7 +427,7 @@ export default function SharedFileView({ token }) {
                 >
                   {/* PDF Thumbnails panel inside Document wrapper */}
                   {numPages > 0 && (
-                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-150/70 bg-slate-50/65 p-4 w-[130px] shrink-0 overflow-y-auto max-h-[82vh] items-center">
+                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-150/70 bg-slate-50/65 p-4 w-[130px] shrink-0 overflow-y-auto max-h-[calc(100vh-320px)] items-center">
                       {Array.from(new Array(numPages), (el, index) => (
                         <button
                           key={index}
@@ -466,12 +444,16 @@ export default function SharedFileView({ token }) {
                               scale={0.1}
                               renderAnnotationLayer={false}
                               renderTextLayer={false}
-                              loading={<div className="h-16 w-12 bg-slate-100 animate-pulse" />}
+                              loading={
+                                <div className="h-16 w-12 bg-slate-100 animate-pulse" />
+                              }
                             />
                           </div>
                           <span
                             className={`text-[9px] mt-1 font-bold ${
-                              activePage === index + 1 ? "text-[#c62828]" : "text-slate-500"
+                              activePage === index + 1
+                                ? "text-[#c62828]"
+                                : "text-slate-500"
                             }`}
                           >
                             {index + 1}
@@ -482,7 +464,7 @@ export default function SharedFileView({ token }) {
                   )}
 
                   {/* Main PDF Page Display Canvas */}
-                  <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[82vh]">
+                  <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[calc(100vh-320px)]">
                     <div className="bg-slate-100/60 p-4 rounded-2xl shadow-inner overflow-hidden flex flex-col items-center max-w-full">
                       <Page
                         pageNumber={activePage}
@@ -496,7 +478,7 @@ export default function SharedFileView({ token }) {
                 </Document>
               ) : (
                 /* Other mime types (Image, word, excel, text, etc.) */
-                <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[82vh]">
+                <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[calc(100vh-320px)]">
                   <div
                     className="transition-transform duration-200 origin-top max-w-full flex justify-center"
                     style={{ transform: `scale(${zoom / 100})` }}
@@ -521,9 +503,9 @@ export default function SharedFileView({ token }) {
                             Secure Shared File
                           </h3>
                           <p className="text-xs text-slate-500 leading-relaxed">
-                            This file cannot be previewed in the browser. You can
-                            download the file directly using the actions on the
-                            right.
+                            This file cannot be previewed in the browser. You
+                            can download the file directly using the actions on
+                            the right.
                           </p>
                         </div>
                         <div className="text-[10px] text-slate-400 border-t border-slate-100 pt-4 text-center font-medium">
@@ -538,7 +520,7 @@ export default function SharedFileView({ token }) {
           </div>
 
           {/* Right panel: Details and Actions */}
-          <div className="flex flex-col gap-6 w-full lg:w-[360px] shrink-0">
+          <div className="flex flex-col gap-6 w-full lg:w-[320px] shrink-0">
             {/* Card 1: File details */}
             <div className="bg-white/60 backdrop-blur-md border border-slate-200/40 rounded-3xl p-6 shadow-xs flex flex-col gap-5">
               <h4 className="text-sm font-extrabold text-slate-800">
@@ -598,7 +580,9 @@ export default function SharedFileView({ token }) {
                     <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
                       <User size={12} />
                     </div>
-                    <span>{share?.owner?.email || "alexjohnson@kumori.ai"}</span>
+                    <span>
+                      {share?.owner?.email || "alexjohnson@kumori.ai"}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -612,9 +596,7 @@ export default function SharedFileView({ token }) {
 
             {/* Card 2: Actions */}
             <div className="bg-white/60 backdrop-blur-md border border-slate-200/40 rounded-3xl p-6 shadow-xs flex flex-col gap-4">
-              <h4 className="text-sm font-extrabold text-slate-800">
-                Actions
-              </h4>
+              <h4 className="text-sm font-extrabold text-slate-800">Actions</h4>
 
               <button
                 onClick={handleDownload}
@@ -680,7 +662,9 @@ export default function SharedFileView({ token }) {
                     {activePage} / {numPages}
                   </span>
                   <button
-                    onClick={() => setActivePage(Math.min(numPages, activePage + 1))}
+                    onClick={() =>
+                      setActivePage(Math.min(numPages, activePage + 1))
+                    }
                     disabled={activePage === numPages}
                     className="p-1.5 hover:bg-white/10 rounded-lg text-white border border-white/20 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer flex items-center"
                   >
@@ -695,7 +679,9 @@ export default function SharedFileView({ token }) {
                 >
                   <ZoomOut size={12} />
                 </button>
-                <span className="font-semibold min-w-8 text-center">{zoom}%</span>
+                <span className="font-semibold min-w-8 text-center">
+                  {zoom}%
+                </span>
                 <button
                   onClick={() => setZoom(Math.min(200, zoom + 10))}
                   className="hover:bg-white/10 border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5 text-white"
@@ -734,7 +720,10 @@ export default function SharedFileView({ token }) {
             ) : (
               <div
                 className="transition-transform duration-200 origin-top max-w-full flex justify-center bg-white rounded-2xl shadow-xl overflow-hidden p-6"
-                style={{ transform: mimeGroup === "PDF" ? "none" : `scale(${zoom / 100})` }}
+                style={{
+                  transform:
+                    mimeGroup === "PDF" ? "none" : `scale(${zoom / 100})`,
+                }}
               >
                 {mimeGroup === "PDF" ? (
                   <div className="bg-slate-100 p-2 rounded-xl relative min-w-[280px] min-h-[360px] flex items-center justify-center">
@@ -742,7 +731,9 @@ export default function SharedFileView({ token }) {
                       <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-100/90 z-10 rounded-xl">
                         <div className="flex flex-col items-center gap-3 text-center">
                           <div className="w-8 h-8 rounded-full border-3 border-slate-300 border-t-[#c62828] animate-spin" />
-                          <span className="text-slate-600 font-semibold text-xs">Loading PDF...</span>
+                          <span className="text-slate-600 font-semibold text-xs">
+                            Loading PDF...
+                          </span>
                         </div>
                       </div>
                     )}
@@ -777,8 +768,8 @@ export default function SharedFileView({ token }) {
                       Secure Shared File
                     </h3>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      This file cannot be previewed in fullscreen. You can download
-                      the file to view its full contents.
+                      This file cannot be previewed in fullscreen. You can
+                      download the file to view its full contents.
                     </p>
                   </div>
                 )}

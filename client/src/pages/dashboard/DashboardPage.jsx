@@ -32,7 +32,7 @@ export default function DashboardPage() {
       />
 
       {/* Main Panel */}
-      <main className="grow flex flex-col min-h-screen p-6 lg:p-8 overflow-y-auto">
+      <main className={`grow flex flex-col min-h-screen ${dashboard.previewFile ? "p-3 sm:p-4" : "p-6 lg:p-8"} overflow-y-auto`}>
         {/* Top Header bar */}
         {!dashboard.previewFile && (
           <TopBar
@@ -73,39 +73,41 @@ export default function DashboardPage() {
         )}
 
         {/* Footer */}
-        <footer className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-2 text-[13px] text-slate-500">
-            <img
-              src="/mascot.png"
-              alt="Mascot"
-              className="w-5 h-5 object-contain"
-            />
-            <span>© 2026 Kumori. All rights reserved.</span>
-          </div>
-          <div className="flex gap-5">
-            <a
-              href="#help"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Help Center coming soon")}
-            >
-              Help Center
-            </a>
-            <a
-              href="#privacy"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Privacy Policy coming soon")}
-            >
-              Privacy Policy
-            </a>
-            <a
-              href="#terms"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Terms of Service coming soon")}
-            >
-              Terms of Service
-            </a>
-          </div>
-        </footer>
+        {!dashboard.previewFile && (
+          <footer className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-2 text-[13px] text-slate-500">
+              <img
+                src="/mascot.png"
+                alt="Mascot"
+                className="w-5 h-5 object-contain"
+              />
+              <span>© 2026 Kumori. All rights reserved.</span>
+            </div>
+            <div className="flex gap-5">
+              <a
+                href="#help"
+                className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
+                onClick={() => toast.info("Help Center coming soon")}
+              >
+                Help Center
+              </a>
+              <a
+                href="#privacy"
+                className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
+                onClick={() => toast.info("Privacy Policy coming soon")}
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="#terms"
+                className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
+                onClick={() => toast.info("Terms of Service coming soon")}
+              >
+                Terms of Service
+              </a>
+            </div>
+          </footer>
+        )}
       </main>
 
       {/* Share Modal Dialog */}

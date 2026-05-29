@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { selectIsAuthenticated } from "./redux/user/userSlice.js";
 import KumoriLandingPage from "./pages/landing/KumoriLandingPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
@@ -8,6 +15,7 @@ import RegisterPage from "./pages/auth/RegisterPage.jsx";
 import DashboardPage from "./pages/dashboard/DashboardPage.jsx";
 import StorageOverviewPage from "./pages/dashboard/StorageOverviewPage.jsx";
 import SharedFileView from "./pages/public/SharedFileView.jsx";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage.jsx";
 
 // Auth Guard: Only authenticated users can access the route
 function ProtectedRoute({ children }) {
@@ -40,24 +48,36 @@ function AppContent() {
 
   return (
     <Routes>
-      <Route path="/" element={<KumoriLandingPage onNavigate={handleNavigate} />} />
-      
-      <Route 
-        path="/login" 
+      <Route
+        path="/"
+        element={<KumoriLandingPage onNavigate={handleNavigate} />}
+      />
+
+      <Route
+        path="/login"
         element={
           <GuestRoute>
             <LoginPage onNavigate={handleNavigate} />
           </GuestRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/register" 
+
+      <Route
+        path="/register"
         element={
           <GuestRoute>
             <RegisterPage onNavigate={handleNavigate} />
           </GuestRoute>
-        } 
+        }
+      />
+
+      <Route
+        path="/reset-password"
+        element={
+          <GuestRoute>
+            <ResetPasswordPage onNavigate={handleNavigate} />
+          </GuestRoute>
+        }
       />
 
       <Route
@@ -69,19 +89,16 @@ function AppContent() {
         }
       />
 
-      <Route 
-        path="/dashboard/*" 
+      <Route
+        path="/dashboard/*"
         element={
           <ProtectedRoute>
             <DashboardPage />
           </ProtectedRoute>
-        } 
+        }
       />
 
-      <Route 
-        path="/share/:token" 
-        element={<SharedFileViewWrapper />} 
-      />
+      <Route path="/share/:token" element={<SharedFileViewWrapper />} />
 
       {/* Fallback redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
