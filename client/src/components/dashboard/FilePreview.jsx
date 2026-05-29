@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  Star,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
@@ -41,7 +40,7 @@ export default function FilePreview({
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const [zoom, setZoom] = useState(100);
-  const [starred, setStarred] = useState(false);
+
   const [activePage, setActivePage] = useState(1);
   const [numPages, setNumPages] = useState(null);
   const { accessToken } = useSelector((state) => state.user);
@@ -215,21 +214,6 @@ export default function FilePreview({
             >
               {getSafeFileName()}
             </h2>
-            <button
-              onClick={() => {
-                setStarred(!starred);
-                toast.success(
-                  starred ? "Removed from starred" : "Added to starred",
-                );
-              }}
-              className="text-slate-400 hover:text-amber-500 cursor-pointer border-none bg-transparent outline-none p-0 flex items-center shrink-0"
-            >
-              <Star
-                size={15}
-                fill={starred ? "#f59e0b" : "none"}
-                className={starred ? "text-amber-500" : "text-slate-400"}
-              />
-            </button>
           </div>
         </div>
 

@@ -29,6 +29,12 @@ body {
 	box-sizing: border-box;
 }
 
+table,
+th,
+td {
+	font-family: inherit;
+}
+
 a {
 	color: inherit;
 	text-decoration: none;
@@ -155,4 +161,4 @@ select {
 .animate-upload-bar {
 	animation: uploadProgress 3.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
 }
-
+

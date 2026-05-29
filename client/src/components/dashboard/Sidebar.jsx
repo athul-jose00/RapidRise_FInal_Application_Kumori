@@ -2,7 +2,6 @@ import {
   Folder,
   Users,
   Clock,
-  Star,
   Trash2,
   ChevronDown,
   Upload,
@@ -113,7 +112,6 @@ export default function Sidebar({
             { name: "My Files", icon: <Folder className="w-5 h-5 shrink-0" /> },
             { name: "Shared", icon: <Users className="w-5 h-5 shrink-0" /> },
             { name: "Recent", icon: <Clock className="w-5 h-5 shrink-0" /> },
-            { name: "Starred", icon: <Star className="w-5 h-5 shrink-0" /> },
             { name: "Trash", icon: <Trash2 className="w-5 h-5 shrink-0" /> },
           ].map((item) => (
             <button

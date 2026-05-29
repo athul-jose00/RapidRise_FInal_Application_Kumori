@@ -6,6 +6,8 @@ import {
   Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
+  Presentation,
+  Archive,
 } from "lucide-react";
 
 export default function SharedMainTable({
@@ -23,19 +25,84 @@ export default function SharedMainTable({
   const getFileIcon = (mimeType, name) => {
     const mime = (mimeType || "").toLowerCase();
     const fileName = (name || "").toLowerCase();
+
     if (mime.includes("pdf") || fileName.endsWith(".pdf")) {
-      return <FileText size={20} className="text-[#DC2626]" />;
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-red-50 text-red-600">
+          <FileText size={18} />
+        </div>
+      );
     }
-    if (mime.includes("text") || fileName.endsWith(".txt") || mime.includes("word") || fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
-      return <FileText size={20} className="text-[#2563EB]" />;
+    if (
+      mime.includes("word") ||
+      fileName.endsWith(".doc") ||
+      fileName.endsWith(".docx") ||
+      mime.includes("text") ||
+      fileName.endsWith(".txt")
+    ) {
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
+          <FileText size={18} />
+        </div>
+      );
     }
-    if (mime.includes("excel") || mime.includes("spreadsheet") || fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
-      return <FileSpreadsheet size={20} className="text-emerald-500" />;
+    if (
+      mime.includes("excel") ||
+      mime.includes("spreadsheet") ||
+      fileName.endsWith(".xlsx") ||
+      fileName.endsWith(".xls")
+    ) {
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600">
+          <FileSpreadsheet size={18} />
+        </div>
+      );
     }
-    if (mime.includes("image/") || fileName.endsWith(".png") || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".webp")) {
-      return <ImageIcon size={20} className="text-cyan-500" />;
+    if (
+      mime.includes("powerpoint") ||
+      fileName.endsWith(".ppt") ||
+      fileName.endsWith(".pptx")
+    ) {
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-orange-50 text-orange-600">
+          <Presentation size={18} />
+        </div>
+      );
     }
-    return <File size={20} className="text-slate-500" />;
+    if (
+      mime.includes("image/") ||
+      fileName.endsWith(".png") ||
+      fileName.endsWith(".jpg") ||
+      fileName.endsWith(".jpeg") ||
+      fileName.endsWith(".gif") ||
+      fileName.endsWith(".webp")
+    ) {
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-cyan-50 text-cyan-600">
+          <ImageIcon size={18} />
+        </div>
+      );
+    }
+    if (
+      mime.includes("zip") ||
+      mime.includes("tar") ||
+      mime.includes("rar") ||
+      mime.includes("gzip") ||
+      fileName.endsWith(".zip") ||
+      fileName.endsWith(".rar") ||
+      fileName.endsWith(".7z")
+    ) {
+      return (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-600">
+          <Archive size={18} />
+        </div>
+      );
+    }
+    return (
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-50 text-slate-500">
+        <File size={18} />
+      </div>
+    );
   };
 
   const getInitials = (email) => {
@@ -55,12 +122,12 @@ export default function SharedMainTable({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase bg-slate-50/50">
-              <th className="px-6 py-4">Name</th>
-              <th className="px-6 py-4">Recipients</th>
-              <th className="px-6 py-4">Created</th>
-              <th className="px-6 py-4">Expires</th>
-              <th className="px-6 py-4">Views</th>
+            <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/40">
+              <th className="pl-8 pr-6 py-3 font-bold text-[#c62828] hover:bg-slate-50">Name</th>
+              <th className="px-6 py-3 font-bold">Recipients</th>
+              <th className="px-6 py-3 font-bold">Created</th>
+              <th className="px-6 py-3 font-bold">Expires</th>
+              <th className="pr-8 pl-6 py-3 font-bold text-center">Views</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -82,21 +149,19 @@ export default function SharedMainTable({
                 <tr
                   key={group.fileId}
                   onClick={() => onSelectFile(group.fileId)}
-                  className={`hover:bg-slate-50/70 transition-colors cursor-pointer text-sm font-semibold text-slate-700 ${
+                  className={`hover:bg-slate-50/50 transition-colors cursor-pointer text-xs font-semibold text-slate-500 ${
                     isSelected ? "bg-red-50/30 hover:bg-red-50/40" : ""
                   }`}
                 >
                   {/* Name column */}
-                  <td className="px-6 py-4.5">
+                  <td className="pl-8 pr-6 py-3 font-medium text-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                        {getFileIcon(group.mimeType, group.fileName)}
-                      </div>
+                      {getFileIcon(group.mimeType, group.fileName)}
                       <div className="flex flex-col truncate max-w-[200px] sm:max-w-xs">
-                        <span className="text-slate-800 font-bold truncate" title={group.fileName}>
+                        <span className="truncate text-[13.5px] font-semibold text-slate-800" title={group.fileName}>
                           {group.fileName}
                         </span>
-                        <span className="text-[11px] text-slate-400 font-bold mt-0.5">
+                        <span className="text-[11px] text-slate-400 font-medium mt-0.5">
                           {formatBytes(group.fileSize)}
                         </span>
                       </div>
@@ -104,13 +169,13 @@ export default function SharedMainTable({
                   </td>
 
                   {/* Recipients column */}
-                  <td className="px-6 py-4.5">
+                  <td className="px-6 py-3">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center -space-x-1.5">
                         {group.shares.slice(0, 2).map((share, idx) => (
                           <div
                             key={share.id}
-                            className={`w-6.5 h-6.5 rounded-full border border-white flex items-center justify-center text-[10px] font-extrabold text-white shrink-0 ${
+                            className={`w-6.5 h-6.5 rounded-full border border-white flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
                               idx === 0
                                 ? "bg-indigo-500"
                                 : "bg-purple-500"
@@ -121,32 +186,32 @@ export default function SharedMainTable({
                           </div>
                         ))}
                         {totalRecipients > 2 && (
-                          <div className="w-6.5 h-6.5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-extrabold text-slate-650 shrink-0">
+                          <div className="w-6.5 h-6.5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-650 shrink-0">
                             +{totalRecipients - 2}
                           </div>
                         )}
                       </div>
-                      <span className="text-[11px] text-slate-400 font-bold">
+                      <span className="text-[11px] text-slate-400 font-semibold">
                         {totalRecipients} recipient{totalRecipients > 1 ? "s" : ""}
                       </span>
                     </div>
                   </td>
 
                   {/* Created column */}
-                  <td className="px-6 py-4.5">
+                  <td className="px-6 py-3 text-xs font-semibold text-slate-500">
                     <div className="flex flex-col">
-                      <span className="text-slate-700">{formatDateTime(group.createdAt).split(",")[0]}</span>
-                      <span className="text-[11px] text-slate-400 font-bold mt-0.5">
+                      <span className="text-slate-800 font-semibold">{formatDateTime(group.createdAt).split(",")[0]}</span>
+                      <span className="text-[10px] text-slate-400 font-medium mt-0.5">
                         {formatDateTime(group.createdAt).split(",")[1]}
                       </span>
                     </div>
                   </td>
 
                   {/* Expires column */}
-                  <td className="px-6 py-4.5">
+                  <td className="px-6 py-3 text-xs font-semibold text-slate-500">
                     <div className="flex flex-col">
                       <span
-                        className={`text-xs font-bold ${
+                        className={`text-xs font-semibold ${
                           isRevoked
                             ? "text-orange-500"
                             : isExpired
@@ -158,15 +223,15 @@ export default function SharedMainTable({
                       >
                         {timeRemainingText}
                       </span>
-                      <span className="text-[11px] text-slate-400 font-bold mt-0.5">
+                      <span className="text-[10px] text-slate-400 font-medium mt-0.5">
                         {isRevoked ? "Link disabled" : isExpired ? formatDateTime(group.expiresAt).split(",")[0] : `Today, ${formatDateTime(group.expiresAt).split(",")[1]}`}
                       </span>
                     </div>
                   </td>
 
                   {/* Views column */}
-                  <td className="px-6 py-4.5">
-                    <span className="text-slate-700 text-center min-w-[20px]">{viewsCount}</span>
+                  <td className="pr-8 pl-6 py-3 text-xs font-semibold text-slate-500 text-center">
+                    <span>{viewsCount}</span>
                   </td>
                 </tr>
               );

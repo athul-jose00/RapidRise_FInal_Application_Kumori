@@ -70,7 +70,7 @@ export default function SharedSidePanel({
   const ownerAvatar = currentUser?.profileImage || null;
 
   return (
-    <div className="w-full lg:w-[360px] bg-white border border-slate-100 rounded-3xl p-5 shadow-xs shrink-0 self-stretch overflow-y-auto flex flex-col gap-6 relative">
+    <div className="w-full lg:w-[360px] bg-white border border-slate-100 rounded-3xl p-5 shadow-xs shrink-0 self-stretch overflow-y-auto flex flex-col gap-6 relative font-sans">
       {/* Header section with file type, name, size and close */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3.5 truncate">
@@ -78,10 +78,10 @@ export default function SharedSidePanel({
             {getFileIcon(selectedGroup.mimeType, selectedGroup.fileName)}
           </div>
           <div className="flex flex-col truncate">
-            <span className="text-sm font-bold text-slate-800 truncate" title={selectedGroup.fileName}>
+            <span className="text-sm font-semibold text-slate-800 truncate" title={selectedGroup.fileName}>
               {selectedGroup.fileName}
             </span>
-            <span className="text-xs text-slate-400 font-bold mt-0.5">
+            <span className="text-xs text-slate-400 font-medium mt-0.5">
               {formatBytes(selectedGroup.fileSize)}
             </span>
           </div>
@@ -97,7 +97,7 @@ export default function SharedSidePanel({
       {/* Overview Block */}
       <div className="flex flex-col gap-4">
         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Overview</h4>
-        <div className="flex flex-col gap-3.5 text-xs font-semibold text-slate-655">
+        <div className="flex flex-col gap-3.5 text-xs font-medium text-slate-600">
           <div className="flex justify-between items-center">
             <span className="text-slate-400">Shared on</span>
             <span>{formatDateTime(selectedGroup.createdAt)}</span>
@@ -135,7 +135,7 @@ export default function SharedSidePanel({
       {/* Link Information Block */}
       <div className="flex flex-col gap-4">
         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Link Information</h4>
-        <div className="flex flex-col gap-3.5 text-xs font-semibold text-slate-655">
+        <div className="flex flex-col gap-3.5 text-xs font-medium text-slate-600">
           <div className="flex justify-between items-center">
             <span className="text-slate-400">Created by</span>
             <span>{ownerName}</span>
@@ -192,7 +192,7 @@ export default function SharedSidePanel({
           {selectedGroup.shares.map((share, idx) => (
             <div key={share.id} className="flex items-center gap-3">
               <div
-                className={`w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-extrabold text-white shrink-0 ${
+                className={`w-7.5 h-7.5 rounded-full flex items-center justify-center text-[10.5px] font-bold text-white shrink-0 ${
                   share.revokedAt
                     ? "bg-slate-400"
                     : idx % 4 === 0
@@ -207,10 +207,10 @@ export default function SharedSidePanel({
                 {getInitials(share.recipientEmail)}
               </div>
               <div className="flex flex-col truncate flex-1 min-w-0">
-                <span className={`text-xs font-bold truncate ${share.revokedAt ? "text-slate-400 line-through" : "text-slate-800"}`} title={share.recipientEmail}>
+                <span className={`text-xs font-semibold truncate ${share.revokedAt ? "text-slate-400 line-through" : "text-slate-800"}`} title={share.recipientEmail}>
                   {share.recipientEmail}
                 </span>
-                <span className="text-[10px] text-slate-400 font-bold mt-0.5">
+                <span className="text-[10px] text-slate-400 font-medium mt-0.5">
                   {share.revokedAt
                     ? "Revoked"
                     : share.openedAt
@@ -240,7 +240,7 @@ export default function SharedSidePanel({
                   onClick={() => onDeleteShare && onDeleteShare(share.id)}
                   disabled={revoking || deleting}
                   title="Delete share link permanently"
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-655 cursor-pointer border border-slate-200 hover:border-red-100 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center bg-white"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600 cursor-pointer border border-slate-200 hover:border-red-100 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center bg-white"
                 >
                   <Trash2 size={13} />
                 </button>

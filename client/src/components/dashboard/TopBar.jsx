@@ -1,4 +1,4 @@
-import { Search, Bell, ChevronDown, Menu, X, User, Settings, LogOut } from "lucide-react";
+import { Search, ChevronDown, Menu, X, User, Settings, LogOut } from "lucide-react";
 import { toast } from "react-toastify";
 import { useState, useRef, useEffect } from "react";
 
@@ -59,16 +59,6 @@ export default function TopBar({
 
       {/* Top Actions */}
       <div className="flex items-center gap-5 shrink-0">
-        <button 
-          className="bg-transparent hover:bg-slate-100 rounded-full w-10 h-10 flex items-center justify-center cursor-pointer relative text-slate-600 transition-all duration-200 border-none outline-none"
-          onClick={() => toast.info("You have 3 new notifications")}
-        >
-          <Bell size={20} className="text-slate-700" />
-          <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-4.5 h-4.5 flex items-center justify-center border-2 border-white">
-            3
-          </span>
-        </button>
-        
         <div className="relative" ref={dropdownRef}>
           <div 
             className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition-colors"

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { SlidersHorizontal } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../../../api/axios";
 import { selectCurrentUser } from "../../../redux/user/userSlice";
@@ -11,6 +10,7 @@ export default function SharedTabPage() {
   const [shares, setShares] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFileId, setSelectedFileId] = useState(null);
+  const [isClosedByUser, setIsClosedByUser] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [revoking, setRevoking] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -70,12 +70,12 @@ export default function SharedTabPage() {
 
   const grouped = getGroupedShares();
 
-  // Automatically select the latest share group if none selected
+  // Automatically select the latest share group if none selected and not closed by user
   useEffect(() => {
-    if (grouped.length > 0 && !selectedFileId) {
+    if (grouped.length > 0 && !selectedFileId && !isClosedByUser) {
       setSelectedFileId(grouped[0].fileId);
     }
-  }, [grouped, selectedFileId]);
+  }, [grouped, selectedFileId, isClosedByUser]);
 
   // Pagination calculations (8 items per page)
   const itemsPerPage = 8;
@@ -212,10 +212,6 @@ export default function SharedTabPage() {
             Files and folders that you have shared with others.
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-extrabold cursor-pointer transition-colors outline-none shrink-0 shadow-xs">
-          <SlidersHorizontal size={14} />
-          Filters
-        </button>
       </div>
 
       {/* Main Split Layout */}
@@ -223,7 +219,10 @@ export default function SharedTabPage() {
         <SharedMainTable
           groupedShares={paginatedGrouped}
           selectedFileId={selectedFileId}
-          onSelectFile={setSelectedFileId}
+          onSelectFile={(fileId) => {
+            setSelectedFileId(fileId);
+            setIsClosedByUser(false);
+          }}
           formatBytes={formatBytes}
           formatDateTime={formatDateTime}
           formatTimeRemaining={formatTimeRemaining}
@@ -236,7 +235,10 @@ export default function SharedTabPage() {
         {activeGroup && (
           <SharedSidePanel
             selectedGroup={activeGroup}
-            onClose={() => setSelectedFileId(null)}
+            onClose={() => {
+              setSelectedFileId(null);
+              setIsClosedByUser(true);
+            }}
             formatBytes={formatBytes}
             formatDateTime={formatDateTime}
             formatTimeRemaining={formatTimeRemaining}

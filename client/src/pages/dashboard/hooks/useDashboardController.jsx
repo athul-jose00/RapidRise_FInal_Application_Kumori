@@ -24,7 +24,6 @@ import DashboardHomeTabPage from "../tabs/DashboardHomeTabPage";
 import MyFilesTabPage from "../tabs/MyFilesTabPage";
 import SharedTabPage from "../tabs/SharedTabPage";
 import RecentTabPage from "../tabs/RecentTabPage";
-import StarredTabPage from "../tabs/StarredTabPage";
 import TrashTabPage from "../tabs/TrashTabPage";
 
 export default function useDashboardController() {
@@ -41,7 +40,6 @@ export default function useDashboardController() {
     if (path === "/dashboard/files") return "My Files";
     if (path === "/dashboard/shared") return "Shared";
     if (path === "/dashboard/recent") return "Recent";
-    if (path === "/dashboard/starred") return "Starred";
     if (path === "/dashboard/trash") return "Trash";
     if (path === "/dashboard/upload") return "Upload";
     return "Dashboard";
@@ -154,7 +152,6 @@ export default function useDashboardController() {
     if (tab === "My Files") navigate("/dashboard/files");
     else if (tab === "Shared") navigate("/dashboard/shared");
     else if (tab === "Recent") navigate("/dashboard/recent");
-    else if (tab === "Starred") navigate("/dashboard/starred");
     else if (tab === "Trash") navigate("/dashboard/trash");
     else if (tab === "Upload") navigate("/dashboard/upload");
     else navigate("/dashboard");
@@ -387,8 +384,6 @@ export default function useDashboardController() {
       result = result.filter((f) => f.shares && f.shares.length > 0);
     } else if (activeTab === "Recent") {
       result = result.filter((f) => new Date(f.createdAt) > recentCutoff);
-    } else if (activeTab === "Starred") {
-      result = result.filter((_, idx) => idx % 4 === 0);
     } else if (activeTab === "Trash") {
       result = [...trashFiles];
     }
@@ -482,14 +477,7 @@ export default function useDashboardController() {
       );
     }
 
-    if (activeTab === "Starred") {
-      return (
-        <StarredTabPage
-          onCreateNew={onCreateNew}
-          fileListProps={fileListProps}
-        />
-      );
-    }
+
 
     if (activeTab === "Trash") {
       return (
