@@ -82,29 +82,7 @@ export default function DashboardPage() {
             />
             <span>© 2026 Kumori. All rights reserved.</span>
           </div>
-          <div className="flex gap-5">
-            <a
-              href="#help"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Help Center coming soon")}
-            >
-              Help Center
-            </a>
-            <a
-              href="#privacy"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Privacy Policy coming soon")}
-            >
-              Privacy Policy
-            </a>
-            <a
-              href="#terms"
-              className="text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={() => toast.info("Terms of Service coming soon")}
-            >
-              Terms of Service
-            </a>
-          </div>
+
         </footer>
       </main>
 

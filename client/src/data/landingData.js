@@ -108,8 +108,8 @@ export const workflowSteps = [
 export const footerLinks = {
   Product: ["Features", "Solutions", "Pricing", "Security"],
   Company: ["About Us", "Careers", "Blog", "Press"],
-  Resources: ["Documentation", "Help Center", "Community", "Status"],
-  Legal: ["Privacy Policy", "Terms of Service", "Cookie Settings"],
+  Resources: ["Documentation", "Community", "Status"],
+  Legal: ["Cookie Settings"],
 };
 
 export const contactLinks = ["support@kumori.ai", "+81 (0) 3 1234 5678"];
