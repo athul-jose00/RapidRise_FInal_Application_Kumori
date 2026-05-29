@@ -411,22 +411,6 @@ export default function StorageOverviewPage() {
                         </button>
                       </div>
                     </div>
-
-                    <div className="bg-white border border-slate-100 rounded-lg p-4 shadow-xs">
-                      <h4 className="font-semibold">Need More Space?</h4>
-                      <p className="text-xs text-slate-400 mt-2 font-medium">
-                        Upgrade your plan to get more storage and advanced
-                        features.
-                      </p>
-                      <div className="mt-4">
-                        <button
-                          className="px-4 py-2 rounded-lg bg-white text-[#c62828] border border-[#f5c6c6] font-bold text-xs hover:bg-red-50/50 transition-colors cursor-pointer outline-none"
-                          onClick={() => toast.info("Premium plans and upgrades are currently unavailable in the preview environment.")}
-                        >
-                          Upgrade Now
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>

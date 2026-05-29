@@ -1,7 +1,6 @@
 import MetricsRow from "../../../components/dashboard/MetricsRow";
 import FileList from "../../../components/dashboard/FileList";
 import StorageOverview from "../../../components/dashboard/StorageOverview";
-import QuickActions from "../../../components/dashboard/QuickActions";
 
 export default function DashboardHomeTabPage({
   currentUser,
@@ -45,12 +44,6 @@ export default function DashboardHomeTabPage({
             storagePercentage={storagePercentage}
             formatBytes={formatBytes}
             categorySizes={categorySizes}
-          />
-
-          <QuickActions
-            onUploadClick={onUploadClick}
-            onShareClick={onShareClick}
-            onTrashClick={onTrashClick}
           />
         </div>
       </div>
