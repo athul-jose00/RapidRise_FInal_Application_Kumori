@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendResetEmail } from "../utils/email.js";
+import cloudinary from "../config/cloudinary.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
 const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || "15m";
@@ -123,6 +124,7 @@ const register = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        profileImage: user.profileImage,
       },
       refreshToken,
     });
@@ -177,6 +179,7 @@ const login = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        profileImage: user.profileImage,
       },
     });
   } catch (err) {
@@ -426,6 +429,56 @@ const revokeAllOtherSessions = async (req, res) => {
   }
 };
 
+const updateProfileImage = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "kumori-profiles",
+        resource_type: "image",
+      },
+      async (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          return res.status(500).json({ message: "Image upload failed" });
+        }
+        
+        try {
+          const user = await prisma.user.update({
+            where: { id: userId },
+            data: { profileImage: result.secure_url },
+          });
+
+          return res.status(200).json({
+            message: "Profile image updated",
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              profileImage: user.profileImage,
+            }
+          });
+        } catch (dbError) {
+          console.error("Database update error:", dbError);
+          return res.status(500).json({ message: "Failed to update profile image in database" });
+        }
+      }
+    );
+
+    // Write the buffer to the upload stream
+    uploadStream.end(req.file.buffer);
+
+  } catch (err) {
+    console.error("Profile image update error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export {
   register,
   login,
@@ -437,4 +490,5 @@ export {
   getAllSessions,
   revokeSession,
   revokeAllOtherSessions,
+  updateProfileImage,
 };

@@ -1,4 +1,4 @@
-import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
 export default function StorageOverview({
   totalStorageUsedBytes,
@@ -6,13 +6,15 @@ export default function StorageOverview({
   formatBytes,
   categorySizes
 }) {
+  const navigate = useNavigate();
+
   return (
     <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-xs">
       <div className="flex justify-between items-center mb-5">
         <h2 className="text-[17px] font-bold text-slate-800">Storage Overview</h2>
         <button 
           className="text-xs font-bold text-[#c62828] hover:text-[#b71c1c] hover:underline cursor-pointer flex items-center gap-1 bg-transparent border-none"
-          onClick={() => toast.info("Storage details is coming soon!")}
+          onClick={() => navigate("/dashboard/storage")}
         >
           View Details
         </button>

@@ -10,8 +10,10 @@ import {
   getAllSessions,
   revokeSession,
   revokeAllOtherSessions,
+  updateProfileImage,
 } from "../controllers/auth.controller.js";
 import authenticate from "../middleware/auth.middleware.js";
+import { upload } from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
@@ -25,5 +27,6 @@ router.post("/logout", logout);
 router.get("/sessions", authenticate, getAllSessions);
 router.delete("/sessions/:sessionId", authenticate, revokeSession);
 router.post("/sessions/revoke-others", authenticate, revokeAllOtherSessions);
+router.put("/profile-image", authenticate, upload.single("profileImage"), updateProfileImage);
 
 export default router;

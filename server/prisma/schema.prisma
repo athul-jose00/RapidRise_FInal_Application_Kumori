@@ -18,6 +18,7 @@ model User {
   sessions             Session[]
   files                File[]
   shares               FileShare[] @relation("ownerShares")
+  profileImage         String?
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
 }
@@ -91,6 +92,7 @@ model FileShare {
   message        String?
   expiresAt      DateTime
   openedAt       DateTime?
+  revokedAt      DateTime?
   createdAt      DateTime @default(now())
   file           File     @relation(fields: [fileId], references: [id])
   owner          User     @relation("ownerShares", fields: [ownerId], references: [id])

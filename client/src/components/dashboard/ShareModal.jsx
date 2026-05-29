@@ -1,4 +1,6 @@
 import { X, Check, Copy } from "lucide-react";
+import { useState } from "react";
+import { toast } from "react-toastify";
 
 export default function ShareModal({
   setIsShareModalOpen,
@@ -15,6 +17,88 @@ export default function ShareModal({
   copyToClipboard,
   copied
 }) {
+  const [emailInput, setEmailInput] = useState("");
+  const [emailsList, setEmailsList] = useState([]);
+
+  const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const handleAddEmail = () => {
+    const cleanedInput = emailInput.trim();
+    if (!cleanedInput) return;
+    
+    // Split by semicolons, commas, or whitespace
+    const splitEmails = cleanedInput.split(/[;,\s\n]+/).map(e => e.trim()).filter(Boolean);
+    const validEmails = [];
+    const invalidEmails = [];
+    const duplicateEmails = [];
+    
+    splitEmails.forEach(email => {
+      if (!validateEmail(email)) {
+        invalidEmails.push(email);
+      } else if (emailsList.includes(email) || validEmails.includes(email)) {
+        duplicateEmails.push(email);
+      } else {
+        validEmails.push(email);
+      }
+    });
+    
+    if (invalidEmails.length > 0) {
+      toast.error(`Invalid email format: ${invalidEmails.join(", ")}`);
+    }
+    if (duplicateEmails.length > 0) {
+      toast.info(`Already added: ${duplicateEmails.join(", ")}`);
+    }
+    
+    if (validEmails.length > 0) {
+      setEmailsList([...validEmails, ...emailsList]); // Prepend to show at top
+      setEmailInput("");
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddEmail();
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    let finalEmails = [...emailsList];
+    
+    // If user typed an email but forgot to click Add, try to add it
+    if (emailInput.trim()) {
+      const cleaned = emailInput.trim();
+      const splitEmails = cleaned.split(/[;,\s\n]+/).map(e => e.trim()).filter(Boolean);
+      let hasInvalid = false;
+      
+      splitEmails.forEach(email => {
+        if (validateEmail(email)) {
+          if (!finalEmails.includes(email)) {
+            finalEmails.push(email);
+          }
+        } else {
+          hasInvalid = true;
+        }
+      });
+
+      if (hasInvalid) {
+        toast.error("Please enter a valid email address before sharing");
+        return;
+      }
+      setEmailInput("");
+    }
+
+    if (finalEmails.length === 0) {
+      toast.error("Please add at least one recipient");
+      return;
+    }
+
+    handleShareSubmit(e, finalEmails);
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-200">
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6 relative border border-slate-100 animate-in fade-in-0 zoom-in-95 duration-200">
@@ -23,7 +107,7 @@ export default function ShareModal({
             Share "{shareFile?.originalFileName || "File"}"
           </h3>
           <button 
-            className="bg-transparent hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg p-1.5 flex items-center justify-center cursor-pointer transition-all duration-150 border-none" 
+            className="bg-transparent hover:bg-slate-50 text-slate-400 hover:text-slate-650 rounded-lg p-1.5 flex items-center justify-center cursor-pointer transition-all duration-150 border-none outline-none" 
             onClick={() => setIsShareModalOpen(false)}
           >
             <X size={18} />
@@ -40,7 +124,7 @@ export default function ShareModal({
                 Shared Successfully!
               </div>
               <p className="text-[13px] text-emerald-700/80 leading-relaxed">
-                The share email has been successfully sent to the recipient.
+                The share email(s) have been successfully sent to the recipient(s).
               </p>
             </div>
             <div className="flex justify-end gap-3">
@@ -53,18 +137,49 @@ export default function ShareModal({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleShareSubmit}>
+          <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-500">Recipient Email *</label>
-                <input 
-                  type="email" 
-                  required 
-                  placeholder="email@example.com" 
-                  className="bg-white border border-slate-200 rounded-xl p-2.5 px-3.5 text-sm outline-none focus:border-[#c62828] transition-all duration-200"
-                  value={shareEmail}
-                  onChange={(e) => setShareEmail(e.target.value)}
-                />
+                
+                {/* Chip list of added emails above the input */}
+                {emailsList.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto mb-2 border border-slate-100 p-2 rounded-xl bg-slate-50/50">
+                    {emailsList.map((email, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex items-center gap-1 bg-white border border-slate-200/60 rounded-full pl-2.5 pr-1.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-red-50 hover:border-red-100 hover:text-[#c62828] transition-all duration-150 shrink-0"
+                      >
+                        <span className="truncate max-w-[150px]" title={email}>{email}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEmailsList(emailsList.filter((e) => e !== email))}
+                          className="bg-transparent hover:bg-slate-100 text-slate-400 hover:text-slate-650 rounded-full p-0.5 flex items-center justify-center cursor-pointer border-none outline-none"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="email@example.com" 
+                    className="flex-1 bg-white border border-slate-200 rounded-xl p-2.5 px-3.5 text-sm outline-none focus:border-[#c62828] transition-all duration-200"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEmail}
+                    className="rounded-xl px-4 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-750 hover:text-slate-900 border border-slate-200 cursor-pointer transition-all duration-150 flex items-center justify-center shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -95,7 +210,7 @@ export default function ShareModal({
             <div className="flex justify-end gap-3 mt-6">
               <button 
                 type="button" 
-                className="rounded-xl p-2.5 px-4.5 text-sm font-bold cursor-pointer transition-all duration-200 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600" 
+                className="rounded-xl p-2.5 px-4.5 text-sm font-bold cursor-pointer transition-all duration-200 border border-slate-200 bg-white hover:bg-slate-50 text-slate-650" 
                 onClick={() => setIsShareModalOpen(false)}
                 disabled={sharingInProgress}
               >

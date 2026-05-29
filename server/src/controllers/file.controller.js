@@ -110,7 +110,13 @@ const normalizeUploadError = (err) => {
   return { status: 500, message: "Upload error" };
 };
 
-const streamDownload = async (res, file) => {
+const isPrematureCloseError = (err) =>
+  err?.code === "ERR_STREAM_PREMATURE_CLOSE" ||
+  err?.code === "ECONNRESET" ||
+  String(err?.message || "").toLowerCase().includes("premature close");
+
+const streamDownload = async (res, file, inline = false) => {
+  const disposition = inline ? "inline" : "attachment";
   // If file stored locally
   if (file.storageBackend === "local" && file.storedFileName) {
     const fullPath = path.join(
@@ -125,10 +131,14 @@ const streamDownload = async (res, file) => {
     res.set("Content-Type", file.mimeType);
     res.set(
       "Content-Disposition",
-      `attachment; filename="${file.originalFileName}"`,
+      `${disposition}; filename="${file.originalFileName}"`,
     );
     res.set("Access-Control-Expose-Headers", "Content-Disposition");
-    await pipeline(readStream, res);
+    try {
+      await pipeline(readStream, res);
+    } catch (err) {
+      if (!isPrematureCloseError(err)) throw err;
+    }
     return;
   }
 
@@ -153,11 +163,15 @@ const streamDownload = async (res, file) => {
     res.set("Content-Type", file.mimeType);
     res.set(
       "Content-Disposition",
-      `attachment; filename="${file.originalFileName}"`,
+      `${disposition}; filename="${file.originalFileName}"`,
     );
     res.set("Access-Control-Expose-Headers", "Content-Disposition");
 
-    await pipeline(Readable.fromWeb(response.body), res);
+    try {
+      await pipeline(Readable.fromWeb(response.body), res);
+    } catch (err) {
+      if (!isPrematureCloseError(err)) throw err;
+    }
     return;
   }
 
@@ -168,7 +182,7 @@ const streamDownload = async (res, file) => {
     {
       resource_type: file.cloudinaryResourceType || "raw",
       type: "upload",
-      attachment: true,
+      attachment: !inline,
     },
   );
 
@@ -182,11 +196,15 @@ const streamDownload = async (res, file) => {
   res.set("Content-Type", file.mimeType);
   res.set(
     "Content-Disposition",
-    `attachment; filename="${file.originalFileName}"`,
+    `${disposition}; filename="${file.originalFileName}"`,
   );
   res.set("Access-Control-Expose-Headers", "Content-Disposition");
 
-  await pipeline(Readable.fromWeb(response.body), res);
+  try {
+    await pipeline(Readable.fromWeb(response.body), res);
+  } catch (err) {
+    if (!isPrematureCloseError(err)) throw err;
+  }
 };
 
 const uploadFiles = async (req, res) => {
@@ -449,10 +467,13 @@ const downloadFile = async (req, res) => {
     if (file.userId !== req.user.id)
       return res.status(403).json({ message: "Access denied" });
 
-    await streamDownload(res, file);
+    const inline = req.query.inline === "true";
+    await streamDownload(res, file, inline);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Download error" });
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Download error" });
+    }
   }
 };
 
@@ -623,4 +644,5 @@ export {
   listTrashedFiles,
   restoreFile,
   permanentlyDeleteFile,
+  streamDownload,
 };

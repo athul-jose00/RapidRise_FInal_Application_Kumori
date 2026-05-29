@@ -1,13 +1,27 @@
-import { Search, Bell, ChevronDown, Menu, X } from "lucide-react";
+import { Search, Bell, ChevronDown, Menu, X, User, Settings, LogOut } from "lucide-react";
 import { toast } from "react-toastify";
+import { useState, useRef, useEffect } from "react";
 
 export default function TopBar({
   searchQuery,
   setSearchQuery,
   setMobileSidebarOpen,
   currentUser,
-  onProfileClick
+  onProfileSettingsClick,
+  handleLogout
 }) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
   return (
     <div className="flex justify-between items-center mb-8 gap-5 w-full">
       {/* Mobile Hamburger menu */}
@@ -55,19 +69,56 @@ export default function TopBar({
           </span>
         </button>
         
-        <div 
-          className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
-          onClick={onProfileClick}
-        >
-          <img 
-            src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser?.firstName || "user"}`} 
-            alt="Avatar" 
-            className="w-9 h-9 rounded-full object-cover border border-slate-200/60" 
-          />
-          <span className="text-sm font-semibold text-slate-800 hidden sm:inline">
-            {currentUser?.firstName || "Alex"}
-          </span>
-          <ChevronDown className="text-slate-500 w-4 h-4" />
+        <div className="relative" ref={dropdownRef}>
+          <div 
+            className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+          >
+            {currentUser?.profileImage ? (
+              <img 
+                src={currentUser.profileImage} 
+                alt="Profile" 
+                className="w-9 h-9 rounded-full object-cover border border-slate-200/60 shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200/60 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-slate-400" />
+              </div>
+            )}
+            <span className="text-sm font-semibold text-slate-800 hidden sm:inline">
+              {currentUser?.firstName || "Alex"}
+            </span>
+            <ChevronDown className={`text-slate-500 w-4 h-4 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`} />
+          </div>
+
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-50">
+              <div className="px-4 py-2 border-b border-slate-100 mb-2">
+                <p className="text-sm font-semibold text-slate-800">{currentUser?.firstName} {currentUser?.lastName}</p>
+                <p className="text-xs text-slate-500 truncate">{currentUser?.email}</p>
+              </div>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer border-none outline-none bg-transparent"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  if (onProfileSettingsClick) onProfileSettingsClick();
+                }}
+              >
+                <Settings size={16} />
+                Profile Settings
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 transition-colors cursor-pointer border-none outline-none bg-transparent"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  if (handleLogout) handleLogout();
+                }}
+              >
+                <LogOut size={16} />
+                Log Out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

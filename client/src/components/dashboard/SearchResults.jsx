@@ -11,7 +11,8 @@ import {
   Presentation,
   Archive,
 } from "lucide-react";
-import api from "../../api/axios";
+import api, { API_ROOT } from "../../api/axios";
+import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
 export default function SearchResults({
@@ -22,7 +23,8 @@ export default function SearchResults({
 }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
-  const [activeFilter, setActiveFilter] = useState("all"); // 'all', 'files', 'images', 'content'
+  const [activeFilter, setActiveFilter] = useState("all");
+  const { accessToken } = useSelector((state) => state.user);
 
   useEffect(() => {
     if (!query || !query.trim()) {
@@ -288,7 +290,9 @@ export default function SearchResults({
               </div>
               <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
                 {images.slice(0, activeFilter === "all" ? 4 : undefined).map((img) => {
-                  const url = img.cloudinaryUrl || `/api/files/${img.id}/download`;
+                  const url = img?.cloudinaryUrl?.startsWith("http") 
+                    ? img.cloudinaryUrl 
+                    : `${API_ROOT}/api/files/${img.id}/download?token=${accessToken}`;
                   return (
                     <div
                       key={img.id}

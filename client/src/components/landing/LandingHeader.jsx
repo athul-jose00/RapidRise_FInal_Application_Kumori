@@ -47,15 +47,15 @@ export default function LandingHeader({ mobileOpen, setMobileOpen, scrolled }) {
 
         <div className="hidden items-center gap-5 lg:flex">
           {isAuthenticated ? (
-            <Button variant="accent" href="#/dashboard">
+            <Button variant="accent" href="/dashboard">
               Dashboard
             </Button>
           ) : (
             <>
-              <a href="#/login" className="text-sm font-semibold text-neutral-600 transition-colors hover:text-neutral-900">
+              <a href="/login" className="text-sm font-semibold text-neutral-600 transition-colors hover:text-neutral-900">
                 Log in
               </a>
-              <Button variant="accent" href="#/register">
+              <Button variant="accent" href="/register">
                 Get Started
               </Button>
             </>
@@ -97,7 +97,7 @@ export default function LandingHeader({ mobileOpen, setMobileOpen, scrolled }) {
               {isAuthenticated ? (
                 <Button
                   variant="accent"
-                  href="#/dashboard"
+                  href="/dashboard"
                   className="w-full py-2.5 text-center"
                   onClick={() => setMobileOpen(false)}
                 >
@@ -106,7 +106,7 @@ export default function LandingHeader({ mobileOpen, setMobileOpen, scrolled }) {
               ) : (
                 <>
                   <a 
-                    href="#/login" 
+                    href="/login" 
                     onClick={() => setMobileOpen(false)}
                     className="w-full py-2.5 text-center text-sm font-semibold text-neutral-600 hover:bg-neutral-50 rounded-xl transition-colors"
                   >
@@ -114,7 +114,7 @@ export default function LandingHeader({ mobileOpen, setMobileOpen, scrolled }) {
                   </a>
                   <Button
                     variant="accent"
-                    href="#/register"
+                    href="/register"
                     className="w-full py-2.5 text-center"
                     onClick={() => setMobileOpen(false)}
                   >

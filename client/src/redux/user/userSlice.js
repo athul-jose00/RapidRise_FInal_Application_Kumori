@@ -39,6 +39,21 @@ export const registerUser = createAsyncThunk(
   },
 );
 
+export const updateProfileImage = createAsyncThunk(
+  "user/updateProfileImage",
+  async (formData, thunkAPI) => {
+    try {
+      const response = await api.put(`/api/auth/profile-image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
 const userSlice = createSlice({
   name: "user",
   initialState,
@@ -105,6 +120,21 @@ const userSlice = createSlice({
         state.error = null;
       })
       .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      })
+      .addCase(updateProfileImage.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfileImage.fulfilled, (state, action) => {
+        state.loading = false;
+        state.error = null;
+        if (action.payload.user) {
+          state.currentUser = action.payload.user;
+        }
+      })
+      .addCase(updateProfileImage.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || action.error.message;
       });

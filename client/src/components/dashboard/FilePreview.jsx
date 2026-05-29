@@ -6,6 +6,7 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
+  Share2,
   FileText,
   FileSpreadsheet,
   Image as ImageIcon,
@@ -14,8 +15,19 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
+import { API_ROOT } from "../../api/axios";
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+// Configure PDFJS Worker using local Vite resolution
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 export default function FilePreview({
   file,
@@ -31,6 +43,31 @@ export default function FilePreview({
   const [zoom, setZoom] = useState(100);
   const [starred, setStarred] = useState(false);
   const [activePage, setActivePage] = useState(1);
+  const [numPages, setNumPages] = useState(null);
+  const { accessToken } = useSelector((state) => state.user);
+  const [containerWidth, setContainerWidth] = useState(null);
+  const [isPdfLoading, setIsPdfLoading] = useState(true);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    setIsPdfLoading(true);
+    setActivePage(1);
+    setNumPages(null);
+  }, [file?.id]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) {
+        // contentRect width does not include padding or scrollbars
+        const width = entries[0].contentRect.width;
+        // Subtract horizontal padding (p-4 is 16px on each side, total 32px)
+        setContainerWidth(Math.max(200, width - 32));
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const getSafeFileName = () =>
     file?.originalFileName || file?.fileName || "Untitled";
@@ -92,7 +129,9 @@ export default function FilePreview({
   };
 
   const mimeGroup = getFileMimeGroup();
-  const imageUrl = file?.cloudinaryUrl || `/api/files/${file?.id}/download`;
+  const imageUrl = file?.cloudinaryUrl?.startsWith("http") 
+    ? file.cloudinaryUrl 
+    : `${API_ROOT}/api/files/${file?.id}/download?token=${accessToken}`;
 
   // Dynamically partition document text to enable page turning
   const getPagesArray = () => {
@@ -111,7 +150,7 @@ export default function FilePreview({
   };
 
   const pages = getPagesArray();
-  const totalPages = file?.fileContent?.pageCount || pages.length || 1;
+  const totalPages = mimeGroup === "PDF" && numPages ? numPages : (file?.fileContent?.pageCount || pages.length || 1);
   const currentPageContent = pages[activePage - 1] || pages[0] || "";
 
   const activityList = [
@@ -138,17 +177,19 @@ export default function FilePreview({
   return (
     <div className="flex flex-col grow bg-white min-h-0 overflow-y-auto">
       {/* Top Preview Action Header */}
-      <div className="flex items-center justify-between p-4 bg-white border-b border-slate-100 flex-wrap gap-4 shrink-0">
-        <div className="flex items-center gap-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border-b border-slate-100 gap-4 shrink-0 w-full">
+        <div className="flex items-center justify-between sm:justify-start gap-3.5 w-full sm:w-auto min-w-0">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer transition-colors outline-none"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer transition-colors outline-none shrink-0"
           >
-            <ArrowLeft size={14} /> Back to files
+            <ArrowLeft size={14} /> 
+            <span className="hidden xs:inline">Back to files</span>
+            <span className="inline xs:hidden">Back</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-slate-400 shrink-0">
               {mimeGroup === "PDF" && (
                 <FileText size={18} color="#DC2626" />
               )}
@@ -169,7 +210,7 @@ export default function FilePreview({
               )}
             </span>
             <h2
-              className="text-sm font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs"
+              className="text-sm font-bold text-slate-800 truncate max-w-[120px] sm:max-w-xs"
               title={getSafeFileName()}
             >
               {getSafeFileName()}
@@ -181,7 +222,7 @@ export default function FilePreview({
                   starred ? "Removed from starred" : "Added to starred",
                 );
               }}
-              className="text-slate-400 hover:text-amber-500 cursor-pointer border-none bg-transparent outline-none p-0 flex items-center"
+              className="text-slate-400 hover:text-amber-500 cursor-pointer border-none bg-transparent outline-none p-0 flex items-center shrink-0"
             >
               <Star
                 size={15}
@@ -193,31 +234,7 @@ export default function FilePreview({
         </div>
 
         {/* Page / Zoom / Options Controls */}
-        <div className="flex items-center gap-4">
-          {mimeGroup !== "Image" && (
-            <div className="flex items-center gap-2 border border-slate-200/80 rounded-xl px-2.5 py-1.5 bg-white text-xs text-slate-600 select-none">
-              <button
-                onClick={() => setActivePage(Math.max(1, activePage - 1))}
-                disabled={activePage === 1}
-                className="hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="font-semibold px-1">
-                {activePage} / {totalPages}
-              </span>
-              <button
-                onClick={() =>
-                  setActivePage(Math.min(totalPages, activePage + 1))
-                }
-                disabled={activePage === totalPages}
-                className="hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer outline-none flex items-center p-0.5"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
-
+        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
           <div className="flex items-center gap-2 border border-slate-200/80 rounded-xl px-2.5 py-1.5 bg-white text-xs text-slate-650">
             <button
               onClick={() => setZoom(Math.max(50, zoom - 10))}
@@ -234,10 +251,17 @@ export default function FilePreview({
             </button>
           </div>
 
-          <div className="w-[1px] h-4 bg-slate-200" />
+          <div className="w-[1px] h-4 bg-slate-200 hidden sm:block" />
 
           {/* Tools */}
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => openShareModal(file, e)}
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all cursor-pointer border border-slate-200 hover:border-blue-100 outline-none flex items-center justify-center"
+              title="Share"
+            >
+              <Share2 size={15} />
+            </button>
             <button
               onClick={(e) => handleDownload(file, e)}
               className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-[#c62828] hover:text-white transition-all cursor-pointer border border-slate-200 outline-none flex items-center justify-center"
@@ -260,12 +284,12 @@ export default function FilePreview({
       </div>
 
       {/* Main Split Grid */}
-      <div className="flex-1 grid grid-cols-[1fr_360px] gap-6 p-6 min-h-0 overflow-y-auto items-start">
+      <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(0,1.25fr)_360px] gap-5 p-4 sm:p-6 min-h-0 overflow-y-auto items-stretch">
         {/* Left: Interactive Canvas Box */}
-        <div className="bg-transparent rounded-3xl p-8 min-h-[600px] flex flex-col items-center justify-start overflow-auto self-stretch relative">
+        <div className="bg-transparent rounded-3xl p-2 sm:p-3 min-h-[50vh] lg:min-h-[calc(100vh-190px)] flex flex-col items-center justify-start overflow-x-hidden overflow-y-auto self-stretch relative w-full">
           <div
-            className="transition-transform duration-200 origin-top max-w-full"
-            style={{ transform: `scale(${zoom / 100})` }}
+            className="transition-transform duration-200 origin-top max-w-full flex justify-center w-full"
+            style={{ transform: mimeGroup === "PDF" ? 'none' : `scale(${zoom / 100})` }}
           >
             {mimeGroup === "Image" ? (
               <img
@@ -273,11 +297,85 @@ export default function FilePreview({
                 alt={getSafeFileName()}
                 className="rounded-2xl object-contain max-h-[60vh] max-w-full shadow-lg border border-slate-800/15"
               />
+            ) : mimeGroup === "PDF" ? (
+              <div className="bg-slate-100/60 p-2 rounded-2xl shadow-inner overflow-hidden flex flex-row max-w-full w-full min-h-[calc(100vh-240px)] relative">
+                {isPdfLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-100/60 z-10 rounded-2xl">
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <div className="w-8 h-8 rounded-full border-3 border-slate-200 border-t-[#c62828] animate-spin" />
+                      <span className="text-slate-550 font-semibold">Loading PDF...</span>
+                    </div>
+                  </div>
+                )}
+                <Document
+                  file={`${API_ROOT}/api/files/${file?.id}/download?token=${accessToken}`}
+                  onLoadSuccess={({ numPages }) => {
+                    setNumPages(numPages);
+                    setIsPdfLoading(false);
+                  }}
+                  onLoadError={() => setIsPdfLoading(false)}
+                  loading={null}
+                  error={
+                    <div className="flex-1 w-full min-h-[calc(100vh-300px)] flex items-center justify-center p-8 text-red-500 font-medium text-center z-10">
+                      Failed to load PDF file.
+                    </div>
+                  }
+                  className="flex-1 flex min-h-0 w-full"
+                >
+                  {/* PDF Thumbnails panel inside Document wrapper */}
+                  {numPages > 0 && (
+                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-200 bg-slate-50/50 p-4 w-[112px] shrink-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-270px)] items-center">
+                      {Array.from(new Array(numPages), (el, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setActivePage(index + 1)}
+                          className={`flex flex-col items-center p-1 rounded-xl transition-all border-2 w-18 cursor-pointer focus:outline-none bg-white ${
+                            activePage === index + 1
+                              ? "border-[#c62828] shadow-xs"
+                              : "border-transparent hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="w-full overflow-hidden rounded bg-white flex justify-center pointer-events-none">
+                            <Page
+                              pageNumber={index + 1}
+                              scale={0.08}
+                              renderAnnotationLayer={false}
+                              renderTextLayer={false}
+                              loading={<div className="h-14 w-10 bg-slate-100 animate-pulse" />}
+                            />
+                          </div>
+                          <span
+                            className={`text-[9px] mt-1 font-bold ${
+                              activePage === index + 1 ? "text-[#c62828]" : "text-slate-500"
+                            }`}
+                          >
+                            {index + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Main PDF Page Display Canvas */}
+                  <div 
+                    ref={containerRef}
+                    className="flex-1 overflow-auto p-4 flex items-start justify-center max-h-[calc(100vh-270px)] w-full"
+                  >
+                    <Page
+                      pageNumber={activePage}
+                      width={containerWidth ? containerWidth * (zoom / 100) : undefined}
+                      scale={containerWidth ? undefined : (zoom / 100)}
+                      className="shadow-md rounded border border-slate-200 bg-white max-w-full"
+                      renderAnnotationLayer={false}
+                      renderTextLayer={true}
+                    />
+                  </div>
+                </Document>
+              </div>
             ) : (
-              /* PDF, Word, Txt reader page sheet */
+              /* Word, Txt reader page sheet */
               <div
-                className="bg-white shadow-xl border border-slate-200/40 rounded-3xl w-full p-12 flex flex-col justify-between"
-                style={{ width: "650px", minHeight: "850px" }}
+                className="bg-white shadow-xl border border-slate-200/40 rounded-3xl w-full max-w-[650px] p-5 sm:p-12 flex flex-col justify-between min-h-[500px] sm:min-h-[850px]"
               >
                 <div>
                   <div className="flex items-center gap-1.5 text-blue-600 text-xs font-bold uppercase tracking-wider mb-8">
@@ -316,8 +414,32 @@ export default function FilePreview({
             )}
           </div>
 
-          {/* Floating Zoom Bar overlay */}
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xs border border-slate-200 p-2.5 rounded-2xl flex items-center gap-4 shadow-lg z-10">
+          {/* Floating Controls Overlay */}
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xs border border-slate-200 p-2 sm:p-2.5 rounded-2xl flex items-center gap-3 sm:gap-4 shadow-lg z-10 max-w-[90%] justify-center">
+            {mimeGroup !== "Image" && (
+              <div className="flex items-center gap-2 sm:gap-3 pr-3 sm:pr-4 border-r border-slate-200 text-xs sm:text-sm text-slate-650 font-semibold select-none shrink-0">
+                <button
+                  onClick={() => setActivePage(Math.max(1, activePage - 1))}
+                  disabled={activePage === 1}
+                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
+                  title="Previous Page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="shrink-0">
+                  {activePage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setActivePage(Math.min(totalPages, activePage + 1))}
+                  disabled={activePage === totalPages}
+                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent border-none bg-transparent cursor-pointer flex items-center"
+                  title="Next Page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+            
             <button
               onClick={() => setZoom(Math.max(50, zoom - 10))}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 border-none bg-transparent cursor-pointer flex items-center"
@@ -343,19 +465,28 @@ export default function FilePreview({
         </div>
 
         {/* Right: Sidebar Details Panel */}
-        <div className="w-[360px] bg-white border border-slate-100 rounded-3xl p-5 shadow-xs shrink-0 self-stretch overflow-y-auto flex flex-col">
+        <div className="w-full lg:w-[360px] bg-white border border-slate-100 rounded-3xl p-4 sm:p-5 shadow-xs shrink-0 self-stretch lg:overflow-y-auto flex flex-col">
           {/* File Card info top */}
           <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 rounded-2xl mb-5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cyan-50 text-cyan-600 border border-cyan-100">
-                {mimeGroup === "PDF" && (
-                  <FileText size={20} color="#DC2626" />
-                )}
-                {mimeGroup === "Text" && (
-                  <FileText size={20} color="#2563EB" />
-                )}
-                {mimeGroup === "Word" && (
-                  <FileText size={20} color="#2563EB" />
-                )}
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                mimeGroup === "PDF" 
+                  ? "bg-red-50 text-red-600 border-red-100"
+                  : mimeGroup === "Excel"
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  : mimeGroup === "Word" || mimeGroup === "Text"
+                  ? "bg-blue-50 text-blue-600 border-blue-100"
+                  : "bg-cyan-50 text-cyan-600 border-cyan-100"
+              }`}
+            >
+              {mimeGroup === "PDF" && (
+                <FileText size={20} color="#DC2626" />
+              )}
+              {mimeGroup === "Text" && (
+                <FileText size={20} color="#2563EB" />
+              )}
+              {mimeGroup === "Word" && (
+                <FileText size={20} color="#2563EB" />
+              )}
               {mimeGroup === "Excel" && (
                 <FileSpreadsheet size={20} className="text-emerald-500" />
               )}
@@ -451,37 +582,55 @@ export default function FilePreview({
 
                 <div className="flex flex-col gap-4 max-h-56 overflow-y-auto">
                   {file?.shares && file.shares.length > 0 ? (
-                    file.shares.map((p, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-3 text-sm font-semibold"
-                      >
-                        <div className="flex items-center gap-2.5 truncate">
-                          <div className="w-7.5 h-7.5 rounded-full border border-slate-200/60 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
-                            <User size={15} />
+                    file.shares.map((p, i) => {
+                      const isExpired = new Date(p.expiresAt) < new Date();
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-3 text-sm font-semibold border-b border-slate-50 pb-3 last:border-none last:pb-0"
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <div className="w-7.5 h-7.5 rounded-full border border-slate-200/60 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                              <User size={15} />
+                            </div>
+                            <div className="flex flex-col truncate">
+                              <span className="text-slate-800 text-[13.5px] font-semibold truncate" title={p.recipientEmail}>
+                                {p.recipientEmail}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                {isExpired 
+                                  ? `Expired ${formatDateTime(p.expiresAt)}` 
+                                  : `Expires ${formatDateTime(p.expiresAt)}`}
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-slate-800 text-[13.5px] font-medium truncate">
-                            {p.recipientEmail}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0 select-none">
+                            {/* Active/Expired badge */}
+                            <span
+                              className={
+                                isExpired
+                                  ? "text-slate-500 bg-slate-100 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                  : "text-emerald-700 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                              }
+                            >
+                              {isExpired ? "Expired" : "Active"}
+                            </span>
+                            {/* Viewed/Pending badge */}
+                            {!isExpired && (
+                              <span
+                                className={
+                                  p.openedAt
+                                    ? "text-blue-600 bg-blue-50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                    : "text-amber-600 bg-amber-50/50 px-2 py-0.5 text-[10px] font-bold rounded-md"
+                                }
+                              >
+                                {p.openedAt ? "Viewed" : "Pending"}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span
-                            className={
-                              p.openedAt
-                                ? "text-red-650 bg-red-50/80 px-2 py-0.5 text-[11px] font-bold rounded-md"
-                                : "text-amber-600 bg-amber-50/50 px-2 py-0.5 text-[11px] font-bold rounded-md"
-                            }
-                          >
-                            {p.openedAt ? "Viewed" : "Pending"}
-                          </span>
-                          <span className="text-slate-500 text-xs">
-                            {p.openedAt
-                              ? formatTimeAgo(p.openedAt)
-                              : "Expires soon"}
-                          </span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="text-xs text-slate-400 italic">
                       Not shared with anyone yet.

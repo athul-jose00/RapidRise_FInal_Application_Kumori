@@ -1,6 +1,7 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import userReducer from "./user/userSlice";
 import filesReducer from "./files/fileSlice";
+import uploadsReducer from "./uploads/uploadsSlice";
 import { persistReducer, persistStore } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import { attachInterceptors } from "../api/axios";
@@ -9,8 +10,8 @@ const storageEngine = storage && storage.default ? storage.default : storage;
 
 const rootReducer = combineReducers({
   user: userReducer,
-  
   files: filesReducer,
+  uploads: uploadsReducer,
 });
 
 const persistConfig = {
@@ -30,6 +31,5 @@ export const store = configureStore({
 });
 
 export const persistor = persistStore(store);
-
 
 attachInterceptors(store);

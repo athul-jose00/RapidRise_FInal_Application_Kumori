@@ -46,7 +46,8 @@ const createShare = async (req, res) => {
       const shareRecords = await Promise.all(
         emailList.map((recipientEmail) => {
           const token = crypto.randomBytes(32).toString("hex");
-          const shareUrl = `${req.protocol}://${req.get("host")}/public/share/${token}`;
+          const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+          const shareUrl = `${frontendUrl}/share/${token}`;
 
           return prisma.fileShare
             .create({
@@ -137,6 +138,8 @@ const listShares = async (req, res) => {
           select: {
             id: true,
             originalFileName: true,
+            fileSize: true,
+            mimeType: true,
           },
         },
       },
@@ -148,11 +151,14 @@ const listShares = async (req, res) => {
         id: share.id,
         fileId: share.fileId,
         fileName: share.file.originalFileName,
+        fileSize: Number(share.file.fileSize),
+        mimeType: share.file.mimeType,
         recipientEmail: share.recipientEmail,
         createdAt: share.createdAt,
         expiresAt: share.expiresAt,
         openedAt: share.openedAt,
-        status: share.openedAt ? "opened" : "pending",
+        revokedAt: share.revokedAt,
+        status: share.revokedAt ? "revoked" : share.openedAt ? "opened" : "pending",
         token: share.token,
       })),
     });
@@ -164,10 +170,24 @@ const listShares = async (req, res) => {
 
 const publicShare = async (req, res) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     const { token } = req.params;
-    const share = await prisma.fileShare.findUnique({ where: { token } });
+    const share = await prisma.fileShare.findUnique({
+      where: { token },
+      include: {
+        owner: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
     if (!share)
       return res.status(404).json({ message: "Invalid or expired link" });
+    if (share.revokedAt)
+      return res.status(410).json({ message: "This share link has been revoked" });
     if (share.expiresAt < new Date())
       return res.status(410).json({ message: "Link expired" });
 
@@ -188,8 +208,14 @@ const publicShare = async (req, res) => {
         mimeType: file.mimeType,
       },
       share: {
+        createdAt: share.createdAt,
         expiresAt: share.expiresAt,
         recipientEmail: share.recipientEmail,
+        owner: {
+          email: share.owner.email,
+          firstName: share.owner.firstName,
+          lastName: share.owner.lastName,
+        },
       },
     });
   } catch (err) {
@@ -198,4 +224,70 @@ const publicShare = async (req, res) => {
   }
 };
 
-export { createShare, listShares, publicShare };
+const revokeShare = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const share = await prisma.fileShare.findUnique({ where: { id } });
+    if (!share)
+      return res.status(404).json({ message: "Share not found" });
+    if (share.ownerId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+    if (share.revokedAt)
+      return res.status(400).json({ message: "Share is already revoked" });
+
+    await prisma.fileShare.update({
+      where: { id },
+      data: { revokedAt: new Date() },
+    });
+
+    return res.json({ message: "Share link revoked successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Revoke error" });
+  }
+};
+
+const deleteShare = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const share = await prisma.fileShare.findUnique({ where: { id } });
+    if (!share)
+      return res.status(404).json({ message: "Share not found" });
+    if (share.ownerId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+
+    await prisma.fileShare.delete({
+      where: { id },
+    });
+
+    return res.json({ message: "Share link deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Delete error" });
+  }
+};
+
+const restoreShare = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const share = await prisma.fileShare.findUnique({ where: { id } });
+    if (!share)
+      return res.status(404).json({ message: "Share not found" });
+    if (share.ownerId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+    if (!share.revokedAt)
+      return res.status(400).json({ message: "Share is not revoked" });
+
+    await prisma.fileShare.update({
+      where: { id },
+      data: { revokedAt: null },
+    });
+
+    return res.json({ message: "Share link access restored successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Restore error" });
+  }
+};
+
+export { createShare, listShares, publicShare, revokeShare, deleteShare, restoreShare };

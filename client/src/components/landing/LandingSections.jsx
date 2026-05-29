@@ -61,7 +61,7 @@ export function HeroSection({ sectionRef }) {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.16 }}
             className="mt-8 flex flex-wrap items-center gap-4"
           >
-            <Button variant="accent" href="#/register">
+            <Button variant="accent" href="/register">
               Get Started Free
             </Button>
             <a
@@ -263,7 +263,7 @@ export function FeaturesSection({ sectionRef }) {
               </div>
             </div>
             <a
-              href="#/register"
+              href="/register"
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#C62828] px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#D32F2F]"
             >
               Get Started Free
@@ -353,7 +353,7 @@ export function CtaSection({ sectionRef }) {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
-            <Button variant="accent" href="#/register">
+            <Button variant="accent" href="/register">
               Get Started Free
             </Button>
             <Button variant="outline" href="#features">
