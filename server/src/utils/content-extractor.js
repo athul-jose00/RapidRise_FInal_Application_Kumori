@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import { getDocumentProxy, extractText } from "unpdf";
 import { createWorker } from "tesseract.js";
 
 const TEXT_MIME_PREFIX = "text/";
@@ -30,33 +30,30 @@ const buildErrorResult = (sourceType, error, extraMetadata = {}) => ({
 });
 
 /**
- * Extract text from a PDF buffer using pdf-parse.
+ * Extract text from a PDF buffer using unpdf.
  */
 export const extractPdfContent = async (buffer) => {
   if (!buffer || buffer.length === 0) {
     return buildEmptyResult("pdf");
   }
 
-  const parser = new PDFParse({ data: buffer });
+  // unpdf getDocumentProxy expects a Uint8Array
+  const uint8Array = new Uint8Array(buffer);
+  const pdf = await getDocumentProxy(uint8Array);
+  const { totalPages, text } = await extractText(pdf, { mergePages: true });
+  const content = (text || "").trim();
 
-  try {
-    const parsed = await parser.getText();
-    const content = (parsed.text || "").trim();
-
-    return {
-      content,
-      metadata: {
-        sourceType: "pdf",
-        extracted: true,
-        empty: content.length === 0,
-        pageCount: parsed.total ?? parsed.pages?.length ?? null,
-        wordCount: content ? content.split(/\s+/).filter(Boolean).length : 0,
-        info: null,
-      },
-    };
-  } finally {
-    await parser.destroy();
-  }
+  return {
+    content,
+    metadata: {
+      sourceType: "pdf",
+      extracted: true,
+      empty: content.length === 0,
+      pageCount: totalPages ?? null,
+      wordCount: content ? content.split(/\s+/).filter(Boolean).length : 0,
+      info: null,
+    },
+  };
 };
 
 /**
