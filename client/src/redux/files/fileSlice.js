@@ -97,6 +97,65 @@ export const emptyTrash = createAsyncThunk(
   },
 );
 
+export const bulkDeleteFiles = createAsyncThunk(
+  "files/bulkDeleteFiles",
+  async (ids, thunkAPI) => {
+    try {
+      const res = await api.post(`/api/files/bulk-delete`, { ids });
+      return { ids, message: res.data?.message, deletedIds: res.data?.deletedIds || ids };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
+export const bulkPermanentlyDeleteFiles = createAsyncThunk(
+  "files/bulkPermanentlyDeleteFiles",
+  async (ids, thunkAPI) => {
+    try {
+      const res = await api.post(`/api/files/bulk-permanent`, { ids });
+      return { ids, message: res.data?.message, deletedIds: res.data?.deletedIds || ids };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
+export const bulkRestoreFiles = createAsyncThunk(
+  "files/bulkRestoreFiles",
+  async (ids, thunkAPI) => {
+    try {
+      const res = await api.post(`/api/files/bulk-restore`, { ids });
+      return { ids, message: res.data?.message, restoredIds: res.data?.restoredIds || ids };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
+export const generateBulkShareLink = createAsyncThunk(
+  "files/generateBulkShareLink",
+  async ({ fileIds, recipientEmail, expirationHours, message }, thunkAPI) => {
+    try {
+      const body = {
+        fileIds,
+        recipientEmail,
+        expirationHours,
+        message: message || "Shared via Kumori",
+      };
+      const res = await api.post(`/api/shares/bulk`, body);
+      thunkAPI.dispatch(fetchFiles());
+      return res.data;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
 export const restoreFile = createAsyncThunk(
   "files/restoreFile",
   async (id, thunkAPI) => {
@@ -216,6 +275,66 @@ const fileSlice = createSlice({
         state.trashItems = [];
       })
       .addCase(emptyTrash.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
+    builder
+      .addCase(bulkDeleteFiles.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(bulkDeleteFiles.fulfilled, (state, action) => {
+        state.loading = false;
+        const deletedIds = action.payload.deletedIds || [];
+        state.items = state.items.filter((f) => !deletedIds.includes(f.id));
+      })
+      .addCase(bulkDeleteFiles.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
+    builder
+      .addCase(bulkPermanentlyDeleteFiles.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(bulkPermanentlyDeleteFiles.fulfilled, (state, action) => {
+        state.loading = false;
+        const deletedIds = action.payload.deletedIds || [];
+        state.items = state.items.filter((f) => !deletedIds.includes(f.id));
+        state.trashItems = state.trashItems.filter((f) => !deletedIds.includes(f.id));
+      })
+      .addCase(bulkPermanentlyDeleteFiles.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
+    builder
+      .addCase(bulkRestoreFiles.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(bulkRestoreFiles.fulfilled, (state, action) => {
+        state.loading = false;
+        const restoredIds = action.payload.restoredIds || [];
+        state.trashItems = state.trashItems.filter((f) => !restoredIds.includes(f.id));
+      })
+      .addCase(bulkRestoreFiles.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
+    builder
+      .addCase(generateBulkShareLink.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(generateBulkShareLink.fulfilled, (state, action) => {
+        state.loading = false;
+        state.lastShare = action.payload || null;
+      })
+      .addCase(generateBulkShareLink.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || action.error.message;
       });

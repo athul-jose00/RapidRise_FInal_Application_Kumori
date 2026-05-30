@@ -3,7 +3,6 @@ import {
   Cloud,
   Users,
   ShieldCheck,
-  Play,
   FileText,
   FileSpreadsheet,
   Image as ImageIcon,
@@ -65,11 +64,11 @@ export function HeroSection({ sectionRef }) {
               Get Started Free
             </Button>
             <a
-              href="#dashboard"
+              href="#features"
               className="inline-flex items-center justify-center gap-2 rounded-full border border-[#C62828] bg-white px-5 py-2.5 text-sm font-semibold text-[#C62828] shadow-sm transition-all duration-200 hover:bg-red-50/50 hover:shadow"
             >
-              <Play className="h-4 w-4 fill-current" />
-              Watch Demo
+              <Sparkles className="h-4 w-4" />
+              Explore Features
             </a>
           </motion.div>
 

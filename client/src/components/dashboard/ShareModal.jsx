@@ -102,9 +102,11 @@ export default function ShareModal({
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-200">
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6 relative border border-slate-100 animate-in fade-in-0 zoom-in-95 duration-200">
-        <div className="flex justify-between items-center mb-5">
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-slate-800">
-            Share "{shareFile?.originalFileName || "File"}"
+            {Array.isArray(shareFile) 
+              ? `Share ${shareFile.length} files` 
+              : `Share "${shareFile?.originalFileName || "File"}"`}
           </h3>
           <button 
             className="bg-transparent hover:bg-slate-50 text-slate-400 hover:text-slate-650 rounded-lg p-1.5 flex items-center justify-center cursor-pointer transition-all duration-150 border-none outline-none" 
@@ -113,6 +115,19 @@ export default function ShareModal({
             <X size={18} />
           </button>
         </div>
+        
+        {Array.isArray(shareFile) && (
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 mb-4 max-h-24 overflow-y-auto">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Files to share:</span>
+            <ul className="text-xs text-slate-600 space-y-1 list-none pl-0 m-0">
+              {shareFile.map((file, idx) => (
+                <li key={file.id || idx} className="truncate font-semibold text-slate-700">
+                  📄 {file.originalFileName}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         
         {shareLinkSuccess ? (
           <div className="flex flex-col gap-4">

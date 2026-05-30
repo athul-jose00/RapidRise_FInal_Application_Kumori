@@ -13,6 +13,9 @@ import {
   restoreFile,
   permanentlyDeleteFile,
   emptyTrash,
+  bulkDeleteFiles,
+  bulkPermanentlyDeleteFiles,
+  bulkRestoreFiles,
 } from "../controllers/file.controller.js";
 import { searchFileContent } from "../controllers/search.controller.js";
 
@@ -23,6 +26,9 @@ router.post("/upload", authenticate, upload.array("files", 20), uploadFiles);
 router.get("/", authenticate, listFiles);
 router.get("/trash", authenticate, listTrashedFiles);
 router.delete("/trash/empty", authenticate, emptyTrash);
+router.post("/bulk-delete", authenticate, bulkDeleteFiles);
+router.post("/bulk-permanent", authenticate, bulkPermanentlyDeleteFiles);
+router.post("/bulk-restore", authenticate, bulkRestoreFiles);
 router.get("/:id/status", authenticate, getFileStatus);
 router.get("/:fileId/search", authenticate, searchFileContent);
 router.get("/:id/download", authenticate, downloadFile);

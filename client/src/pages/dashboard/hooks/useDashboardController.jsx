@@ -11,6 +11,10 @@ import {
   generateShareLink,
   selectFiles,
   selectTrashFiles,
+  bulkDeleteFiles,
+  bulkPermanentlyDeleteFiles,
+  bulkRestoreFiles,
+  generateBulkShareLink,
 } from "../../../redux/files/fileSlice";
 import {
   logoutUser,
@@ -47,6 +51,11 @@ export default function useDashboardController() {
 
   const activeTab = getActiveTabFromPath(location.pathname);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
+
+  useEffect(() => {
+    setSelectedFileIds([]);
+  }, [searchQuery]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarCollapsed = useSelector((s) => s.user.sidebarCollapsed);
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -149,6 +158,7 @@ export default function useDashboardController() {
   const handleTabChange = (tab) => {
     setPreviewFile(null);
     setSearchQuery("");
+    setSelectedFileIds([]);
     if (tab === "My Files") navigate("/dashboard/files");
     else if (tab === "Shared") navigate("/dashboard/shared");
     else if (tab === "Recent") navigate("/dashboard/recent");
@@ -181,19 +191,25 @@ export default function useDashboardController() {
     }
   };
 
-  const handleDelete = (id, e) => {
+  const handleDelete = (idOrIds, e) => {
     if (e && e.stopPropagation) e.stopPropagation();
-    setConfirmTarget({ id, isTrash: activeTab === "Trash" });
+    setConfirmTarget({ id: idOrIds, isTrash: activeTab === "Trash" });
     setConfirmOpen(true);
   };
 
   const onConfirmMoveToTrash = async () => {
     if (!confirmTarget) return;
-    const id = confirmTarget.id;
+    const target = confirmTarget.id;
     setConfirmOpen(false);
     try {
-      await dispatch(deleteFile(id)).unwrap();
-      toast.success("File moved to trash");
+      if (Array.isArray(target)) {
+        await dispatch(bulkDeleteFiles(target)).unwrap();
+        toast.success(`${target.length} files moved to trash`);
+      } else {
+        await dispatch(deleteFile(target)).unwrap();
+        toast.success("File moved to trash");
+      }
+      setSelectedFileIds([]);
       dispatch(fetchFiles());
       void refreshSharesCount();
     } catch (err) {
@@ -203,11 +219,17 @@ export default function useDashboardController() {
 
   const onConfirmPermanentlyDelete = async () => {
     if (!confirmTarget) return;
-    const id = confirmTarget.id;
+    const target = confirmTarget.id;
     setConfirmOpen(false);
     try {
-      await dispatch(permanentlyDeleteFile(id)).unwrap();
-      toast.success("File permanently deleted");
+      if (Array.isArray(target)) {
+        await dispatch(bulkPermanentlyDeleteFiles(target)).unwrap();
+        toast.success(`${target.length} files permanently deleted`);
+      } else {
+        await dispatch(permanentlyDeleteFile(target)).unwrap();
+        toast.success("File permanently deleted");
+      }
+      setSelectedFileIds([]);
       dispatch(fetchTrashFiles());
       void refreshSharesCount();
     } catch (err) {
@@ -227,6 +249,40 @@ export default function useDashboardController() {
       .catch((err) => {
         toast.error(`Restore failed: ${err}`);
       });
+  };
+
+  const handleBulkRestore = async (ids) => {
+    try {
+      await dispatch(bulkRestoreFiles(ids)).unwrap();
+      toast.success(`${ids.length} files restored successfully`);
+      setSelectedFileIds([]);
+      dispatch(fetchTrashFiles());
+      dispatch(fetchFiles());
+    } catch (err) {
+      toast.error(`Restore failed: ${err}`);
+    }
+  };
+
+  const handleBulkDownload = async (filesToDownload) => {
+    const toastId = toast.info(`Preparing downloads for ${filesToDownload.length} files...`);
+    try {
+      filesToDownload.forEach((file) => {
+        const downloadUrl = `${api.defaults.baseURL || "http://localhost:3000"}/api/files/${file.id}/download${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.setAttribute("download", file.originalFileName);
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+      toast.dismiss(toastId);
+      toast.success(`Started downloads for ${filesToDownload.length} files!`);
+      setSelectedFileIds([]);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Bulk download failed.");
+    }
   };
 
   const openShareModal = (file, e) => {
@@ -251,21 +307,36 @@ export default function useDashboardController() {
     setSharingInProgress(true);
     try {
       const expHours = parseInt(shareExpiration);
-      const actionResult = await dispatch(
-        generateShareLink({
-          id: shareFile.id,
-          recipientEmail: emailsToShare.join(", "),
-          expirationHours: expHours,
-          message: shareMessage,
-        }),
-      ).unwrap();
+      const isBulk = Array.isArray(shareFile);
+
+      let actionResult;
+      if (isBulk) {
+        actionResult = await dispatch(
+          generateBulkShareLink({
+            fileIds: shareFile.map(f => f.id),
+            recipientEmail: emailsToShare.join(", "),
+            expirationHours: expHours,
+            message: shareMessage,
+          })
+        ).unwrap();
+      } else {
+        actionResult = await dispatch(
+          generateShareLink({
+            id: shareFile.id,
+            recipientEmail: emailsToShare.join(", "),
+            expirationHours: expHours,
+            message: shareMessage,
+          })
+        ).unwrap();
+      }
 
       const shares = actionResult.shares || [];
       if (shares.length > 0) {
         setShareLinkSuccess(shares);
         toast.success(
-          `File successfully shared with ${shares.length} recipient(s)!`,
+          `${isBulk ? "Files" : "File"} successfully shared with ${emailsToShare.length} recipient(s)!`,
         );
+        setSelectedFileIds([]);
         void refreshSharesCount();
       } else {
         toast.error("Successfully shared, but could not retrieve share link");
@@ -419,6 +490,10 @@ export default function useDashboardController() {
     handleDrag,
     handleDrop,
     onFileClick: setPreviewFile,
+    selectedFileIds,
+    setSelectedFileIds,
+    handleBulkRestore,
+    handleBulkDownload,
   };
 
   const openShareFromDashboard = () => {
@@ -500,6 +575,10 @@ export default function useDashboardController() {
     setMobileSidebarOpen,
     sidebarCollapsed,
     setSidebarCollapsed: (val) => dispatch(setSidebarCollapsedAction(!!val)),
+    selectedFileIds,
+    setSelectedFileIds,
+    handleBulkRestore,
+    handleBulkDownload,
     previewFile,
     setPreviewFile,
     isProfileModalOpen,

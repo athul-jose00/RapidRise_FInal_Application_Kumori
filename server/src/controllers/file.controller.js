@@ -635,6 +635,125 @@ const emptyTrash = async (req, res) => {
   }
 };
 
+const bulkDeleteFiles = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No file IDs provided" });
+    }
+
+    const userId = req.user.id;
+
+    // Verify files belong to user
+    const files = await prisma.file.findMany({
+      where: { id: { in: ids }, userId },
+    });
+
+    if (files.length === 0) {
+      return res.status(404).json({ message: "No matching files found" });
+    }
+
+    const foundIds = files.map(f => f.id);
+
+    // Delete shares
+    try {
+      await prisma.fileShare.deleteMany({ where: { fileId: { in: foundIds } } });
+    } catch (e) {
+      console.error("Failed to delete related FileShare records in bulk delete", e);
+    }
+
+    // Soft delete
+    await prisma.file.updateMany({
+      where: { id: { in: foundIds } },
+      data: { isTrashed: true, trashedAt: new Date() },
+    });
+
+    res.json({ message: `${foundIds.length} files moved to trash`, deletedIds: foundIds });
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+    res.status(500).json({ message: "Bulk delete failed" });
+  }
+};
+
+const bulkPermanentlyDeleteFiles = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No file IDs provided" });
+    }
+
+    const userId = req.user.id;
+
+    const files = await prisma.file.findMany({
+      where: { id: { in: ids }, userId, isTrashed: true },
+    });
+
+    if (files.length === 0) {
+      return res.status(404).json({ message: "No matching files in trash found" });
+    }
+
+    // Purge assets in parallel
+    await Promise.all(files.map(file => purgeFileAssets(file)));
+
+    const foundIds = files.map(f => f.id);
+
+    // Hard delete
+    await prisma.file.deleteMany({
+      where: { id: { in: foundIds } },
+    });
+
+    res.json({ message: `${foundIds.length} files permanently deleted`, deletedIds: foundIds });
+  } catch (err) {
+    console.error("Bulk permanent delete error:", err);
+    res.status(500).json({ message: "Bulk permanent delete failed" });
+  }
+};
+
+const bulkRestoreFiles = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No file IDs provided" });
+    }
+
+    const userId = req.user.id;
+
+    const files = await prisma.file.findMany({
+      where: { id: { in: ids }, userId, isTrashed: true },
+    });
+
+    if (files.length === 0) {
+      return res.status(404).json({ message: "No matching files in trash found" });
+    }
+
+    // Check storage limits
+    const agg = await prisma.file.aggregate({
+      _sum: { fileSize: true },
+      where: { userId, isTrashed: false },
+    });
+    const used = Number(agg._sum.fileSize ?? 0);
+    const restoreTotalSize = files.reduce((acc, f) => acc + Number(f.fileSize), 0);
+
+    if (used + restoreTotalSize > MAX_USER_STORAGE) {
+      return res.status(400).json({
+        message: "Restoring these files would exceed your storage quota. Free space or upgrade first.",
+      });
+    }
+
+    const foundIds = files.map(f => f.id);
+
+    await prisma.file.updateMany({
+      where: { id: { in: foundIds } },
+      data: { isTrashed: false, trashedAt: null },
+    });
+
+    res.json({ message: `${foundIds.length} files restored`, restoredIds: foundIds });
+  } catch (err) {
+    console.error("Bulk restore error:", err);
+    res.status(500).json({ message: "Bulk restore failed" });
+  }
+};
+
 const getFileStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -676,6 +795,9 @@ export {
   restoreFile,
   permanentlyDeleteFile,
   emptyTrash,
+  bulkDeleteFiles,
+  bulkPermanentlyDeleteFiles,
+  bulkRestoreFiles,
   streamDownload,
   getFileStatus,
 };

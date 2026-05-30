@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  classNames,
   useReveal,
 } from "../../components/landing/landingUtils.jsx";
 import LandingHeader from "../../components/landing/LandingHeader.jsx";

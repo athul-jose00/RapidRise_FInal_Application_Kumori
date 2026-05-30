@@ -1,6 +1,6 @@
 import prisma from "../config/prisma.js";
 import crypto from "crypto";
-import { sendShareEmail } from "../utils/email.js";
+import { sendShareEmail, sendBulkShareEmail } from "../utils/email.js";
 
 const normalizeRecipients = (value) => {
   const rawRecipients = Array.isArray(value)
@@ -125,6 +125,138 @@ const createShare = async (req, res) => {
     }
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const createBulkShare = async (req, res) => {
+  try {
+    const {
+      fileIds,
+      recipientEmail,
+      recipientEmails,
+      recipients,
+      expirationHours,
+      message,
+    } = req.body;
+
+    const emailList = normalizeRecipients(
+      recipientEmails || recipients || recipientEmail,
+    );
+
+    if (!Array.isArray(fileIds) || fileIds.length === 0 || emailList.length === 0 || !expirationHours)
+      return res.status(400).json({ message: "Missing fields" });
+
+    // Validate that all fileIds exist and belong to the user
+    const files = await prisma.file.findMany({
+      where: {
+        id: { in: fileIds },
+        userId: req.user.id,
+      },
+    });
+
+    if (files.length !== fileIds.length) {
+      return res.status(400).json({ message: "Some files were not found or access is denied" });
+    }
+
+    const expiresAt = new Date(
+      Date.now() + parseInt(expirationHours) * 60 * 60 * 1000,
+    );
+
+    const createdShareIds = [];
+    const shareRecordsPerEmail = {};
+
+    try {
+      for (const email of emailList) {
+        shareRecordsPerEmail[email] = [];
+        for (const file of files) {
+          const token = crypto.randomBytes(32).toString("hex");
+          const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+          const shareUrl = `${frontendUrl}/share/${token}`;
+
+          const share = await prisma.fileShare.create({
+            data: {
+              fileId: file.id,
+              ownerId: req.user.id,
+              recipientEmail: email,
+              token,
+              message,
+              expiresAt,
+            },
+          });
+
+          createdShareIds.push(share.id);
+          shareRecordsPerEmail[email].push({
+            id: share.id,
+            originalFileName: file.originalFileName,
+            shareUrl,
+          });
+        }
+      }
+
+      // Send a single email to each recipient containing all their share links
+      const emailResults = await Promise.allSettled(
+        emailList.map((email) =>
+          sendBulkShareEmail(email, shareRecordsPerEmail[email], message),
+        ),
+      );
+
+      const failedRecipients = emailResults
+        .map((result, index) => ({ result, email: emailList[index] }))
+        .filter(({ result }) => result.status === "rejected")
+        .map(({ email, result }) => ({
+          email,
+          error: result.reason?.message || String(result.reason),
+        }));
+
+      if (failedRecipients.length === emailList.length) {
+        // Rollback all shares if all emails failed
+        await prisma.fileShare.deleteMany({
+          where: { id: { in: createdShareIds } },
+        });
+        return res.status(502).json({
+          message: "Share was not sent because the email could not be delivered",
+          failedRecipients,
+        });
+      }
+
+      const allCreatedShares = [];
+      for (const email of emailList) {
+        if (!failedRecipients.some(fr => fr.email === email)) {
+          shareRecordsPerEmail[email].forEach(record => {
+            allCreatedShares.push({
+              id: record.id,
+              recipientEmail: email,
+              shareUrl: record.shareUrl,
+              expiresAt,
+            });
+          });
+        }
+      }
+
+      if (failedRecipients.length > 0) {
+        return res.status(207).json({
+          message: "Share created, but some emails could not be delivered",
+          shares: allCreatedShares,
+          failedRecipients,
+        });
+      }
+
+      return res.status(201).json({
+        message: "Shares created successfully",
+        shares: allCreatedShares,
+      });
+    } catch (e) {
+      console.error("Bulk email send failed", e);
+      await prisma.fileShare.deleteMany({
+        where: { id: { in: createdShareIds } },
+      });
+      return res.status(502).json({
+        message: "Share was not sent because the email could not be delivered",
+      });
+    }
+  } catch (err) {
+    console.error("Bulk share error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -290,4 +422,4 @@ const restoreShare = async (req, res) => {
   }
 };
 
-export { createShare, listShares, publicShare, revokeShare, deleteShare, restoreShare };
+export { createShare, createBulkShare, listShares, publicShare, revokeShare, deleteShare, restoreShare };

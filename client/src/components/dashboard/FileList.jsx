@@ -43,6 +43,10 @@ export default function FileList({
   handleDrag,
   handleDrop,
   onFileClick,
+  selectedFileIds = [],
+  setSelectedFileIds,
+  handleBulkRestore,
+  handleBulkDownload,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTypes, setSelectedTypes] = useState([]);
@@ -218,8 +222,123 @@ export default function FileList({
     }
   };
 
+  const handleRowSelectToggle = (id) => {
+    if (selectedFileIds.includes(id)) {
+      setSelectedFileIds(selectedFileIds.filter(selectedId => selectedId !== id));
+    } else {
+      setSelectedFileIds([...selectedFileIds, id]);
+    }
+  };
+
+  const handleSelectAllToggle = () => {
+    const currentPageIds = currentItems.map(item => item.id);
+    const allSelectedOnPage = currentPageIds.every(id => selectedFileIds.includes(id));
+    if (allSelectedOnPage) {
+      setSelectedFileIds(selectedFileIds.filter(id => !currentPageIds.includes(id)));
+    } else {
+      const newSelected = [...selectedFileIds];
+      currentPageIds.forEach(id => {
+        if (!newSelected.includes(id)) {
+          newSelected.push(id);
+        }
+      });
+      setSelectedFileIds(newSelected);
+    }
+  };
+
+  const handleBulkDownloadClick = () => {
+    const selectedFiles = filteredFiles.filter(f => selectedFileIds.includes(f.id));
+    handleBulkDownload(selectedFiles);
+  };
+
+  const handleBulkShareClick = () => {
+    const selectedFiles = filteredFiles.filter(f => selectedFileIds.includes(f.id));
+    openShareModal(selectedFiles);
+  };
+
+  const handleBulkDeleteClick = () => {
+    handleDelete(selectedFileIds);
+  };
+
+  const handleBulkRestoreClick = () => {
+    handleBulkRestore(selectedFileIds);
+  };
+
   return (
     <div className="bg-white border border-slate-100/80 rounded-3xl shadow-xs overflow-hidden flex flex-col">
+      {/* Bulk Action Bar */}
+      {selectedFileIds.length > 0 && (
+        <div className="bg-slate-900 text-white px-6 py-3.5 flex items-center justify-between border-b border-slate-800 animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={currentItems.length > 0 && currentItems.every((item) => selectedFileIds.includes(item.id))}
+              onChange={handleSelectAllToggle}
+              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-[#c62828] focus:ring-[#c62828]/25 cursor-pointer outline-none"
+            />
+            <span className="text-xs sm:text-sm font-bold tracking-wide">
+              {selectedFileIds.length} {selectedFileIds.length === 1 ? "item" : "items"} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab !== "Trash" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBulkDownloadClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                >
+                  <Download size={13} />
+                  <span className="hidden sm:inline">Download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkShareClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                >
+                  <Share2 size={13} />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-900/60 text-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none shadow-xs"
+                >
+                  <Trash2 size={13} />
+                  <span className="hidden sm:inline">Delete</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBulkRestoreClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                >
+                  <RotateCcw size={13} />
+                  <span className="hidden sm:inline">Restore</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-900/60 text-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none shadow-xs"
+                >
+                  <Trash2 size={13} />
+                  <span className="hidden sm:inline">Delete Permanently</span>
+                </button>
+              </>
+            )}
+            <div className="w-[1px] h-5 bg-slate-800 shrink-0 mx-1" />
+            <button
+              type="button"
+              onClick={() => setSelectedFileIds([])}
+              className="text-xs font-bold text-slate-400 hover:text-white bg-transparent border-none cursor-pointer outline-none"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
       {/* File Controls Header */}
       <div className="flex items-center justify-end p-4 px-6 border-b border-slate-100 bg-white flex-wrap gap-4">
         {/* Dropdown Filters at the right end */}
@@ -322,6 +441,14 @@ export default function FileList({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/40">
+                <th className="py-3 px-4 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={currentItems.length > 0 && currentItems.every((item) => selectedFileIds.includes(item.id))}
+                    onChange={handleSelectAllToggle}
+                    className="w-4 h-4 rounded border-slate-300 text-[#c62828] focus:ring-[#c62828]/25 cursor-pointer outline-none"
+                  />
+                </th>
                 <th className="py-3 px-6 font-bold text-[#c62828] hover:bg-slate-50">
                   Name
                 </th>
@@ -334,13 +461,21 @@ export default function FileList({
               {currentItems.map((item) => (
                 <tr 
                   key={item.id}
-                  className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                  className={`hover:bg-slate-50/50 transition-colors group cursor-pointer ${selectedFileIds.includes(item.id) ? 'bg-red-50/20 hover:bg-red-50/30' : ''}`}
                   onClick={() => {
                     if (item.isRealFile && onFileClick) {
                       onFileClick(item.rawFile);
                     }
                   }}
                 >
+                  <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedFileIds.includes(item.id)}
+                      onChange={() => handleRowSelectToggle(item.id)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#c62828] focus:ring-[#c62828]/25 cursor-pointer outline-none"
+                    />
+                  </td>
                   {/* Name Column */}
                   <td className="py-3.5 px-6 font-medium text-slate-800">
                     <div className="flex items-center gap-3">
