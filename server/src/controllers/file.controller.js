@@ -329,8 +329,12 @@ const uploadFiles = async (req, res) => {
                 inputType: semanticResult.inputType,
                 embeddingKind: semanticResult.embeddingKind,
                 caption: semanticResult.caption || null,
-                labels: Array.isArray(semanticResult.labels) ? semanticResult.labels : [],
-                dimensions: Array.isArray(semanticResult.embedding) ? semanticResult.embedding.length : null,
+                labels: Array.isArray(semanticResult.labels)
+                  ? semanticResult.labels
+                  : [],
+                dimensions: Array.isArray(semanticResult.embedding)
+                  ? semanticResult.embedding.length
+                  : null,
                 vector: semanticResult.embedding,
               },
               update: {
@@ -338,8 +342,12 @@ const uploadFiles = async (req, res) => {
                 inputType: semanticResult.inputType,
                 embeddingKind: semanticResult.embeddingKind,
                 caption: semanticResult.caption || null,
-                labels: Array.isArray(semanticResult.labels) ? semanticResult.labels : [],
-                dimensions: Array.isArray(semanticResult.embedding) ? semanticResult.embedding.length : null,
+                labels: Array.isArray(semanticResult.labels)
+                  ? semanticResult.labels
+                  : [],
+                dimensions: Array.isArray(semanticResult.embedding)
+                  ? semanticResult.embedding.length
+                  : null,
                 vector: semanticResult.embedding,
               },
             });
