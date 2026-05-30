@@ -1,6 +1,96 @@
-import { X, Check, Copy } from "lucide-react";
+import {
+  X,
+  Check,
+  Copy,
+  FileText,
+  FileSpreadsheet,
+  Image as ImageIcon,
+  File,
+  Presentation,
+  Archive,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
+
+const getFileIcon = (mimeType, fileName = "") => {
+  const mime = (mimeType || "").toLowerCase();
+  const name = fileName.toLowerCase();
+
+  if (mime.includes("pdf") || name.endsWith(".pdf")) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-red-50 text-red-600">
+        <FileText size={13} />
+      </div>
+    );
+  }
+  if (
+    mime.includes("word") ||
+    name.endsWith(".doc") ||
+    name.endsWith(".docx")
+  ) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
+        <FileText size={13} />
+      </div>
+    );
+  }
+  if (
+    mime.includes("excel") ||
+    name.endsWith(".xls") ||
+    name.endsWith(".xlsx")
+  ) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600">
+        <FileSpreadsheet size={13} />
+      </div>
+    );
+  }
+  if (
+    mime.includes("powerpoint") ||
+    name.endsWith(".ppt") ||
+    name.endsWith(".pptx")
+  ) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-orange-50 text-orange-600">
+        <Presentation size={13} />
+      </div>
+    );
+  }
+  if (
+    mime.includes("image/") ||
+    name.endsWith(".png") ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".gif") ||
+    name.endsWith(".webp")
+  ) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-cyan-50 text-cyan-600">
+        <ImageIcon size={13} />
+      </div>
+    );
+  }
+  if (
+    mime.includes("zip") ||
+    mime.includes("tar") ||
+    mime.includes("rar") ||
+    mime.includes("gzip") ||
+    name.endsWith(".zip") ||
+    name.endsWith(".rar") ||
+    name.endsWith(".7z")
+  ) {
+    return (
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-slate-100 text-slate-600">
+        <Archive size={13} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-slate-50 text-slate-500">
+      <File size={13} />
+    </div>
+  );
+};
 
 export default function ShareModal({
   setIsShareModalOpen,
@@ -106,7 +196,7 @@ export default function ShareModal({
           <h3 className="text-lg font-bold text-slate-800">
             {Array.isArray(shareFile) 
               ? `Share ${shareFile.length} files` 
-              : `Share "${shareFile?.originalFileName || "File"}"`}
+              : `Share File`}
           </h3>
           <button 
             className="bg-transparent hover:bg-slate-50 text-slate-400 hover:text-slate-650 rounded-lg p-1.5 flex items-center justify-center cursor-pointer transition-all duration-150 border-none outline-none" 
@@ -116,13 +206,16 @@ export default function ShareModal({
           </button>
         </div>
         
-        {Array.isArray(shareFile) && (
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 mb-4 max-h-24 overflow-y-auto">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Files to share:</span>
-            <ul className="text-xs text-slate-600 space-y-1 list-none pl-0 m-0">
-              {shareFile.map((file, idx) => (
-                <li key={file.id || idx} className="truncate font-semibold text-slate-700">
-                  📄 {file.originalFileName}
+        {shareFile && (
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 mb-4 max-h-28 overflow-y-auto">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Files to share:</span>
+            <ul className="space-y-2.5 list-none pl-0 m-0 flex flex-col">
+              {(Array.isArray(shareFile) ? shareFile : [shareFile]).map((file, idx) => (
+                <li key={file.id || idx} className="flex items-center gap-2.5 min-w-0">
+                  {getFileIcon(file.mimeType, file.originalFileName)}
+                  <span className="truncate text-[13.5px] font-semibold text-slate-800 font-sans" title={file.originalFileName}>
+                    {file.originalFileName}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -144,7 +237,7 @@ export default function ShareModal({
             </div>
             <div className="flex justify-end gap-3">
               <button 
-                className="rounded-xl p-2.5 px-5 text-sm font-bold cursor-pointer transition-all duration-200 border border-[#c62828] bg-[#c62828] hover:bg-[#b71c1c] text-white outline-none" 
+                className="rounded-xl p-2.5 px-5 text-sm font-semibold cursor-pointer transition-all duration-200 border border-[#c62828] bg-[#c62828] hover:bg-[#b71c1c] text-white outline-none" 
                 onClick={() => setIsShareModalOpen(false)}
               >
                 Close
@@ -155,7 +248,7 @@ export default function ShareModal({
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500">Recipient Email *</label>
+                <label className="text-xs font-semibold text-slate-500">Recipient Email *</label>
                 
                 {/* Chip list of added emails above the input */}
                 {emailsList.length > 0 && (
@@ -177,7 +270,7 @@ export default function ShareModal({
                     ))}
                   </div>
                 )}
-
+ 
                 <div className="flex gap-2">
                   <input 
                     type="text" 
@@ -190,15 +283,15 @@ export default function ShareModal({
                   <button
                     type="button"
                     onClick={handleAddEmail}
-                    className="rounded-xl px-4 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-750 hover:text-slate-900 border border-slate-200 cursor-pointer transition-all duration-150 flex items-center justify-center shrink-0"
+                    className="rounded-xl px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-750 hover:text-slate-900 border border-slate-200 cursor-pointer transition-all duration-150 flex items-center justify-center shrink-0"
                   >
                     Add
                   </button>
                 </div>
               </div>
-
+ 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500">Link Expiration</label>
+                <label className="text-xs font-semibold text-slate-500">Link Expiration</label>
                 <select 
                   className="bg-white border border-slate-200 rounded-xl p-2.5 px-3.5 text-sm outline-none focus:border-[#c62828] transition-all duration-200"
                   value={shareExpiration}
@@ -210,9 +303,9 @@ export default function ShareModal({
                   <option value="168">7 Days</option>
                 </select>
               </div>
-
+ 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500">Custom Message (Optional)</label>
+                <label className="text-xs font-semibold text-slate-500">Custom Message (Optional)</label>
                 <textarea 
                   placeholder="Add a message for the recipient..." 
                   className="bg-white border border-slate-200 rounded-xl p-2.5 px-3.5 text-sm outline-none min-h-[80px] resize-y focus:border-[#c62828] transition-all duration-200"
@@ -225,7 +318,7 @@ export default function ShareModal({
             <div className="flex justify-end gap-3 mt-6">
               <button 
                 type="button" 
-                className="rounded-xl p-2.5 px-4.5 text-sm font-bold cursor-pointer transition-all duration-200 border border-slate-200 bg-white hover:bg-slate-50 text-slate-650" 
+                className="rounded-xl p-2.5 px-4.5 text-sm font-semibold cursor-pointer transition-all duration-200 border border-slate-200 bg-white hover:bg-slate-50 text-slate-650" 
                 onClick={() => setIsShareModalOpen(false)}
                 disabled={sharingInProgress}
               >
@@ -233,7 +326,7 @@ export default function ShareModal({
               </button>
               <button 
                 type="submit" 
-                className="rounded-xl p-2.5 px-4.5 text-sm font-bold cursor-pointer transition-all duration-200 border border-[#c62828] bg-[#c62828] hover:bg-[#b71c1c] text-white"
+                className="rounded-xl p-2.5 px-4.5 text-sm font-semibold cursor-pointer transition-all duration-200 border border-[#c62828] bg-[#c62828] hover:bg-[#b71c1c] text-white"
                 disabled={sharingInProgress}
               >
                 {sharingInProgress ? "Sharing..." : "Generate & Share"}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
@@ -42,6 +42,42 @@ export default function SharedFileView({ token }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(true);
   const [isFullscreenPdfLoading, setIsFullscreenPdfLoading] = useState(true);
+
+  // Container width tracking for responsive PDF rendering
+  const [pdfContainerWidth, setPdfContainerWidth] = useState(null);
+  const [fullscreenPdfContainerWidth, setFullscreenPdfContainerWidth] = useState(null);
+  const pdfObserverRef = useRef(null);
+  const fullscreenObserverRef = useRef(null);
+
+  // useCallback ref — fires immediately when the DOM node mounts/unmounts
+  const pdfContainerRef = useCallback((node) => {
+    if (pdfObserverRef.current) {
+      pdfObserverRef.current.disconnect();
+      pdfObserverRef.current = null;
+    }
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      // subtract p-8 padding on both sides (32px * 2 = 64px) + inner p-4 (16px * 2 = 32px)
+      setPdfContainerWidth(Math.max(width - 96, 100));
+    });
+    observer.observe(node);
+    pdfObserverRef.current = observer;
+  }, []);
+
+  const fullscreenPdfContainerRef = useCallback((node) => {
+    if (fullscreenObserverRef.current) {
+      fullscreenObserverRef.current.disconnect();
+      fullscreenObserverRef.current = null;
+    }
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      setFullscreenPdfContainerWidth(Math.max(width - 32, 100));
+    });
+    observer.observe(node);
+    fullscreenObserverRef.current = observer;
+  }, []);
 
   useEffect(() => {
     setIsPdfLoading(true);
@@ -313,7 +349,7 @@ export default function SharedFileView({ token }) {
         {/* Inner layout split */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
           {/* Left panel: File viewer */}
-          <div className="bg-white/60 backdrop-blur-md border border-slate-200/40 rounded-3xl shadow-xs overflow-hidden flex flex-col self-stretch min-h-[600px] lg:min-h-0">
+          <div className="bg-white/60 backdrop-blur-md border border-slate-200/40 rounded-3xl shadow-xs overflow-hidden flex flex-col self-stretch min-h-[850px] lg:min-h-[calc(100vh-120px)]">
             {/* Toolbar */}
             <div className="flex items-center justify-between p-4 border-b border-slate-150/65 bg-white select-none shrink-0 gap-4 flex-wrap">
               <div className="flex items-center gap-3">
@@ -427,7 +463,7 @@ export default function SharedFileView({ token }) {
                 >
                   {/* PDF Thumbnails panel inside Document wrapper */}
                   {numPages > 0 && (
-                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-150/70 bg-slate-50/65 p-4 w-[130px] shrink-0 overflow-y-auto max-h-[calc(100vh-320px)] items-center">
+                    <div className="hidden md:flex flex-col gap-4 border-r border-slate-150/70 bg-slate-50/65 p-4 w-[130px] shrink-0 overflow-y-auto h-[750px] lg:h-[calc(100vh-180px)] items-center">
                       {Array.from(new Array(numPages), (el, index) => (
                         <button
                           key={index}
@@ -463,13 +499,23 @@ export default function SharedFileView({ token }) {
                     </div>
                   )}
 
-                  {/* Main PDF Page Display Canvas */}
-                  <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[calc(100vh-320px)]">
-                    <div className="bg-slate-100/60 p-4 rounded-2xl shadow-inner overflow-hidden flex flex-col items-center max-w-full">
+                  {/* ── Main PDF Page Display Canvas ── */}
+                  {/* ref container so ResizeObserver can measure available width */}
+                  <div
+                    ref={pdfContainerRef}
+                    className="flex-1 overflow-auto p-8 flex items-start justify-center h-[750px] lg:h-[calc(100vh-180px)]"
+                  >
+                    <div className="bg-slate-100/60 p-4 rounded-2xl shadow-inner overflow-hidden flex flex-col items-center max-w-full w-full">
                       <Page
                         pageNumber={activePage}
-                        scale={zoom / 100}
-                        className="shadow-md rounded border border-slate-200"
+                        // Use measured container width * zoom factor; fall back to scale until measured
+                        width={
+                          pdfContainerWidth
+                            ? pdfContainerWidth * (zoom / 100)
+                            : undefined
+                        }
+                        scale={pdfContainerWidth ? undefined : zoom / 100}
+                        className="shadow-md rounded border border-slate-200 max-w-full"
                         renderAnnotationLayer={false}
                         renderTextLayer={true}
                       />
@@ -478,7 +524,7 @@ export default function SharedFileView({ token }) {
                 </Document>
               ) : (
                 /* Other mime types (Image, word, excel, text, etc.) */
-                <div className="flex-1 overflow-auto p-8 flex items-start justify-center max-h-[calc(100vh-320px)]">
+                <div className="flex-1 overflow-auto p-8 flex items-start justify-center h-[750px] lg:h-[calc(100vh-180px)]">
                   <div
                     className="transition-transform duration-200 origin-top max-w-full flex justify-center"
                     style={{ transform: `scale(${zoom / 100})` }}
@@ -719,16 +765,13 @@ export default function SharedFileView({ token }) {
               </div>
             ) : (
               <div
-                className="transition-transform duration-200 origin-top max-w-full flex justify-center bg-white rounded-2xl shadow-xl overflow-hidden p-6"
-                style={{
-                  transform:
-                    mimeGroup === "PDF" ? "none" : `scale(${zoom / 100})`,
-                }}
+                ref={fullscreenPdfContainerRef}
+                className="w-full max-w-5xl flex flex-col items-center"
               >
                 {mimeGroup === "PDF" ? (
-                  <div className="bg-slate-100 p-2 rounded-xl relative min-w-[280px] min-h-[360px] flex items-center justify-center">
+                  <div className="w-full bg-slate-100 p-4 rounded-2xl relative min-h-[360px] flex items-start justify-center">
                     {isFullscreenPdfLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-100/90 z-10 rounded-xl">
+                      <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-100/90 z-10 rounded-2xl">
                         <div className="flex flex-col items-center gap-3 text-center">
                           <div className="w-8 h-8 rounded-full border-3 border-slate-300 border-t-[#c62828] animate-spin" />
                           <span className="text-slate-600 font-semibold text-xs">
@@ -748,8 +791,13 @@ export default function SharedFileView({ token }) {
                     >
                       <Page
                         pageNumber={activePage}
-                        scale={(zoom / 100) * 1.3}
-                        className="shadow-md rounded border border-slate-200"
+                        width={
+                          fullscreenPdfContainerWidth
+                            ? fullscreenPdfContainerWidth * (zoom / 100)
+                            : undefined
+                        }
+                        scale={fullscreenPdfContainerWidth ? undefined : (zoom / 100) * 1.3}
+                        className="shadow-md rounded border border-slate-200 max-w-full"
                         renderAnnotationLayer={false}
                         renderTextLayer={true}
                       />
@@ -758,7 +806,7 @@ export default function SharedFileView({ token }) {
                 ) : (
                   /* General Document placeholder */
                   <div
-                    className="bg-white p-12 text-slate-800 font-sans text-xs leading-relaxed whitespace-pre-line text-left"
+                    className="bg-white p-12 text-slate-800 font-sans text-xs leading-relaxed whitespace-pre-line text-left rounded-2xl shadow-xl"
                     style={{ width: "650px", minHeight: "800px" }}
                   >
                     <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">

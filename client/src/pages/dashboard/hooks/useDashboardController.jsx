@@ -266,18 +266,30 @@ export default function useDashboardController() {
   const handleBulkDownload = async (filesToDownload) => {
     const toastId = toast.info(`Preparing downloads for ${filesToDownload.length} files...`);
     try {
-      filesToDownload.forEach((file) => {
+      for (let i = 0; i < filesToDownload.length; i++) {
+        const file = filesToDownload[i];
         const downloadUrl = `${api.defaults.baseURL || "http://localhost:3000"}/api/files/${file.id}/download${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`;
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.setAttribute("download", file.originalFileName);
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
+        
+        // Use an iframe to avoid browser location change collision/cancellations
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = downloadUrl;
+        document.body.appendChild(iframe);
+        
+        // Clean up the iframe after 8 seconds to ensure download handshake completes
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 8000);
+
+        if (i < filesToDownload.length - 1) {
+          // Small delay to keep execution ordered
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+      }
       toast.dismiss(toastId);
-      toast.success(`Started downloads for ${filesToDownload.length} files!`);
+      toast.success(`Initiated downloads for ${filesToDownload.length} files!`);
       setSelectedFileIds([]);
     } catch (err) {
       toast.dismiss(toastId);
@@ -286,7 +298,9 @@ export default function useDashboardController() {
   };
 
   const openShareModal = (file, e) => {
-    e.stopPropagation();
+    if (e && typeof e.stopPropagation === "function") {
+      e.stopPropagation();
+    }
     setShareFile(file);
     setShareEmail("");
     setShareExpiration("24");
@@ -498,7 +512,7 @@ export default function useDashboardController() {
 
   const openShareFromDashboard = () => {
     if (files.length > 0) {
-      openShareModal(files[0], { stopPropagation: () => {} });
+      openShareModal(files[0]);
     } else {
       toast.warning("Upload a file first to share!");
     }

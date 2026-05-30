@@ -268,15 +268,9 @@ export default function FileList({
     <div className="bg-white border border-slate-100/80 rounded-3xl shadow-xs overflow-hidden flex flex-col">
       {/* Bulk Action Bar */}
       {selectedFileIds.length > 0 && (
-        <div className="bg-slate-900 text-white px-6 py-3.5 flex items-center justify-between border-b border-slate-800 animate-in slide-in-from-top duration-200">
+        <div className="bg-red-50/70 border-b border-red-100/60 text-slate-800 px-6 py-3.5 flex items-center justify-between animate-in slide-in-from-top duration-200">
           <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={currentItems.length > 0 && currentItems.every((item) => selectedFileIds.includes(item.id))}
-              onChange={handleSelectAllToggle}
-              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-[#c62828] focus:ring-[#c62828]/25 cursor-pointer outline-none"
-            />
-            <span className="text-xs sm:text-sm font-bold tracking-wide">
+            <span className="text-xs sm:text-sm font-semibold text-slate-700">
               {selectedFileIds.length} {selectedFileIds.length === 1 ? "item" : "items"} selected
             </span>
           </div>
@@ -286,7 +280,7 @@ export default function FileList({
                 <button
                   type="button"
                   onClick={handleBulkDownloadClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 cursor-pointer outline-none shadow-2xs"
                 >
                   <Download size={13} />
                   <span className="hidden sm:inline">Download</span>
@@ -294,7 +288,7 @@ export default function FileList({
                 <button
                   type="button"
                   onClick={handleBulkShareClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 cursor-pointer outline-none shadow-2xs"
                 >
                   <Share2 size={13} />
                   <span className="hidden sm:inline">Share</span>
@@ -302,7 +296,7 @@ export default function FileList({
                 <button
                   type="button"
                   onClick={handleBulkDeleteClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-900/60 text-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF5F5] hover:bg-[#FFEBEB] border border-red-200/60 text-[#c62828] rounded-xl text-xs font-semibold transition-all cursor-pointer outline-none shadow-2xs"
                 >
                   <Trash2 size={13} />
                   <span className="hidden sm:inline">Delete</span>
@@ -313,7 +307,7 @@ export default function FileList({
                 <button
                   type="button"
                   onClick={handleBulkRestoreClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer outline-none shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 cursor-pointer outline-none shadow-2xs"
                 >
                   <RotateCcw size={13} />
                   <span className="hidden sm:inline">Restore</span>
@@ -321,18 +315,18 @@ export default function FileList({
                 <button
                   type="button"
                   onClick={handleBulkDeleteClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-900/60 text-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF5F5] hover:bg-[#FFEBEB] border border-red-200/60 text-[#c62828] rounded-xl text-xs font-semibold transition-all cursor-pointer outline-none shadow-2xs"
                 >
                   <Trash2 size={13} />
                   <span className="hidden sm:inline">Delete Permanently</span>
                 </button>
               </>
             )}
-            <div className="w-[1px] h-5 bg-slate-800 shrink-0 mx-1" />
+            <div className="w-[1px] h-5 bg-slate-200 shrink-0 mx-1" />
             <button
               type="button"
               onClick={() => setSelectedFileIds([])}
-              className="text-xs font-bold text-slate-400 hover:text-white bg-transparent border-none cursor-pointer outline-none"
+              className="text-xs font-semibold text-slate-400 hover:text-slate-600 bg-transparent border-none cursor-pointer outline-none"
             >
               Clear
             </button>
