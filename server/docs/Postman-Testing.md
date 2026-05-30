@@ -201,7 +201,7 @@ shareToken =
 
 **Suggested test file:**
 
-- Use the image file already in `server/uploads` if you want to test with an image.
+- Use the image file already in `uploads` if you want to test with an image.
 
 ---
 

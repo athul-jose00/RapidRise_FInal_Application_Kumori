@@ -79,7 +79,7 @@ const saveBufferToLocal = async (file, userId) => {
   const extension =
     path.extname(file.originalname || "").replace(/^\./, "") || "bin";
   const objectPath = `rapidrise/${userId}/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
-  const uploadsRoot = path.join(process.cwd(), "server", "uploads");
+  const uploadsRoot = path.join(process.cwd(), "uploads");
   const fullPath = path.join(uploadsRoot, objectPath);
   await fsp.mkdir(path.dirname(fullPath), { recursive: true });
   await fsp.writeFile(fullPath, file.buffer);
@@ -653,13 +653,18 @@ const bulkDeleteFiles = async (req, res) => {
       return res.status(404).json({ message: "No matching files found" });
     }
 
-    const foundIds = files.map(f => f.id);
+    const foundIds = files.map((f) => f.id);
 
     // Delete shares
     try {
-      await prisma.fileShare.deleteMany({ where: { fileId: { in: foundIds } } });
+      await prisma.fileShare.deleteMany({
+        where: { fileId: { in: foundIds } },
+      });
     } catch (e) {
-      console.error("Failed to delete related FileShare records in bulk delete", e);
+      console.error(
+        "Failed to delete related FileShare records in bulk delete",
+        e,
+      );
     }
 
     // Soft delete
@@ -668,7 +673,10 @@ const bulkDeleteFiles = async (req, res) => {
       data: { isTrashed: true, trashedAt: new Date() },
     });
 
-    res.json({ message: `${foundIds.length} files moved to trash`, deletedIds: foundIds });
+    res.json({
+      message: `${foundIds.length} files moved to trash`,
+      deletedIds: foundIds,
+    });
   } catch (err) {
     console.error("Bulk delete error:", err);
     res.status(500).json({ message: "Bulk delete failed" });
@@ -689,20 +697,25 @@ const bulkPermanentlyDeleteFiles = async (req, res) => {
     });
 
     if (files.length === 0) {
-      return res.status(404).json({ message: "No matching files in trash found" });
+      return res
+        .status(404)
+        .json({ message: "No matching files in trash found" });
     }
 
     // Purge assets in parallel
-    await Promise.all(files.map(file => purgeFileAssets(file)));
+    await Promise.all(files.map((file) => purgeFileAssets(file)));
 
-    const foundIds = files.map(f => f.id);
+    const foundIds = files.map((f) => f.id);
 
     // Hard delete
     await prisma.file.deleteMany({
       where: { id: { in: foundIds } },
     });
 
-    res.json({ message: `${foundIds.length} files permanently deleted`, deletedIds: foundIds });
+    res.json({
+      message: `${foundIds.length} files permanently deleted`,
+      deletedIds: foundIds,
+    });
   } catch (err) {
     console.error("Bulk permanent delete error:", err);
     res.status(500).json({ message: "Bulk permanent delete failed" });
@@ -723,7 +736,9 @@ const bulkRestoreFiles = async (req, res) => {
     });
 
     if (files.length === 0) {
-      return res.status(404).json({ message: "No matching files in trash found" });
+      return res
+        .status(404)
+        .json({ message: "No matching files in trash found" });
     }
 
     // Check storage limits
@@ -732,22 +747,29 @@ const bulkRestoreFiles = async (req, res) => {
       where: { userId, isTrashed: false },
     });
     const used = Number(agg._sum.fileSize ?? 0);
-    const restoreTotalSize = files.reduce((acc, f) => acc + Number(f.fileSize), 0);
+    const restoreTotalSize = files.reduce(
+      (acc, f) => acc + Number(f.fileSize),
+      0,
+    );
 
     if (used + restoreTotalSize > MAX_USER_STORAGE) {
       return res.status(400).json({
-        message: "Restoring these files would exceed your storage quota. Free space or upgrade first.",
+        message:
+          "Restoring these files would exceed your storage quota. Free space or upgrade first.",
       });
     }
 
-    const foundIds = files.map(f => f.id);
+    const foundIds = files.map((f) => f.id);
 
     await prisma.file.updateMany({
       where: { id: { in: foundIds } },
       data: { isTrashed: false, trashedAt: null },
     });
 
-    res.json({ message: `${foundIds.length} files restored`, restoredIds: foundIds });
+    res.json({
+      message: `${foundIds.length} files restored`,
+      restoredIds: foundIds,
+    });
   } catch (err) {
     console.error("Bulk restore error:", err);
     res.status(500).json({ message: "Bulk restore failed" });

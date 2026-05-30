@@ -23,7 +23,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
     frameguard: false,
     crossOriginOpenerPolicy: false,
-  })
+  }),
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -38,10 +38,7 @@ const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use(limiter);
 
 // Serve uploaded files statically (downloads use controllers to enforce auth/access)
-app.use(
-  "/uploads",
-  express.static(path.join(process.cwd(), "server", "uploads")),
-);
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/", (req, res) => res.send("RapidRise File Sharing API"));
 
