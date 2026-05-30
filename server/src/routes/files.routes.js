@@ -6,11 +6,13 @@ import {
   listFiles,
   downloadFile,
   deleteFile,
+  getFileStatus,
 } from "../controllers/file.controller.js";
 import {
   listTrashedFiles,
   restoreFile,
   permanentlyDeleteFile,
+  emptyTrash,
 } from "../controllers/file.controller.js";
 import { searchFileContent } from "../controllers/search.controller.js";
 
@@ -20,6 +22,8 @@ const router = express.Router();
 router.post("/upload", authenticate, upload.array("files", 20), uploadFiles);
 router.get("/", authenticate, listFiles);
 router.get("/trash", authenticate, listTrashedFiles);
+router.delete("/trash/empty", authenticate, emptyTrash);
+router.get("/:id/status", authenticate, getFileStatus);
 router.get("/:fileId/search", authenticate, searchFileContent);
 router.get("/:id/download", authenticate, downloadFile);
 router.post("/:id/restore", authenticate, restoreFile);

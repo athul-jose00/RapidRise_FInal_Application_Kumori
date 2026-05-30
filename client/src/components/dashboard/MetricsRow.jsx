@@ -1,4 +1,5 @@
 import { Folder, Users, Cloud, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function MetricsRow({
   totalFilesCount,
@@ -6,10 +7,15 @@ export default function MetricsRow({
   totalStorageUsedBytes,
   formatBytes
 }) {
+  const navigate = useNavigate();
+
   return (
     <section className="grid grid-cols-4 max-xl:grid-cols-2 max-sm:grid-cols-1 gap-5 mb-7">
       {/* Total Files Card */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
+      <div 
+        onClick={() => navigate("/dashboard/files")}
+        className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer"
+      >
         <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-red-50 text-[#c62828]">
           <Folder size={24} />
         </div>
@@ -23,7 +29,10 @@ export default function MetricsRow({
       </div>
 
       {/* Shared Files Card */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
+      <div 
+        onClick={() => navigate("/dashboard/shared")}
+        className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer"
+      >
         <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-orange-50 text-orange-600">
           <Users size={24} />
         </div>
@@ -37,7 +46,10 @@ export default function MetricsRow({
       </div>
 
       {/* Storage Used Card */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
+      <div 
+        onClick={() => navigate("/dashboard/storage")}
+        className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer"
+      >
         <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600">
           <Cloud size={24} />
         </div>
@@ -51,7 +63,10 @@ export default function MetricsRow({
       </div>
 
       {/* Files Secure Card */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
+      <div 
+        onClick={() => navigate("/dashboard/storage")}
+        className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-xs hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer"
+      >
         <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
           <Shield size={24} />
         </div>

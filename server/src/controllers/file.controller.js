@@ -11,6 +11,7 @@ import { extractFileContent } from "../utils/content-extractor.js";
 import { embedFileSemanticContent } from "../utils/semantic-indexer.js";
 
 const MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024; // 1 GB
+const activeUploadJobs = new Map(); // fileId -> 'processing'
 
 const getDownloadFormat = (file) => {
   const extension = path
@@ -287,100 +288,72 @@ const uploadFiles = async (req, res) => {
 
       const record = await prisma.file.create({ data: recordData });
 
-      let contentIndexed = false;
-      let extractionError = null;
-      let semanticIndexed = false;
-      let semanticIndexError = null;
-      let semanticCaption = null;
-      let semanticLabels = [];
-      const extracted = await extractFileContent(f.buffer, f.mimetype);
+      // Track this file as active upload processing job
+      activeUploadJobs.set(record.id, "processing");
 
-      try {
-        const extractedContent = extracted?.content || "";
-        const searchIndex = extractedContent.trim().toLowerCase();
-        const hasExtractableText = extractedContent.trim().length > 0;
+      // Run extraction and embedding asynchronously in the background
+      (async () => {
+        try {
+          const extracted = await extractFileContent(f.buffer, f.mimetype);
+          const extractedContent = extracted?.content || "";
+          const searchIndex = extractedContent.trim().toLowerCase();
+          const hasExtractableText = extractedContent.trim().length > 0;
 
-        if (hasExtractableText) {
-          await prisma.fileContent.create({
-            data: {
-              fileId: record.id,
-              content: extractedContent,
-              searchIndex,
-              wordCount: extracted?.metadata?.wordCount ?? null,
-              pageCount: extracted?.metadata?.pageCount ?? null,
-              ocrConfidence: extracted?.metadata?.ocrConfidence ?? null,
-              language: extracted?.metadata?.language ?? null,
-            },
-          });
-        } else {
-          extractionError = new Error(
-            "No extractable text found for this file",
-          );
-        }
+          if (hasExtractableText) {
+            await prisma.fileContent.create({
+              data: {
+                fileId: record.id,
+                content: extractedContent,
+                searchIndex,
+                wordCount: extracted?.metadata?.wordCount ?? null,
+                pageCount: extracted?.metadata?.pageCount ?? null,
+                ocrConfidence: extracted?.metadata?.ocrConfidence ?? null,
+                language: extracted?.metadata?.language ?? null,
+              },
+            });
+          }
 
-        contentIndexed = hasExtractableText;
-      } catch (error) {
-        extractionError = error;
-        console.error("Content extraction failed", {
-          fileId: record.id,
-          fileName: record.originalFileName,
-          mimeType: record.mimeType,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      try {
-        const semanticResult = await embedFileSemanticContent({
-          buffer: f.buffer,
-          mimeType: f.mimetype,
-          extractedContent: extracted?.content || "",
-          originalFileName: record.originalFileName,
-        });
-
-        if (semanticResult?.embedding) {
-          semanticCaption = semanticResult.caption || null;
-          semanticLabels = Array.isArray(semanticResult.labels)
-            ? semanticResult.labels
-            : [];
-
-          await prisma.fileEmbedding.upsert({
-            where: { fileId: record.id },
-            create: {
-              fileId: record.id,
-              model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
-              inputType: semanticResult.inputType,
-              embeddingKind: semanticResult.embeddingKind,
-              caption: semanticCaption,
-              labels: semanticLabels,
-              dimensions: Array.isArray(semanticResult.embedding)
-                ? semanticResult.embedding.length
-                : null,
-              vector: semanticResult.embedding,
-            },
-            update: {
-              model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
-              inputType: semanticResult.inputType,
-              embeddingKind: semanticResult.embeddingKind,
-              caption: semanticCaption,
-              labels: semanticLabels,
-              dimensions: Array.isArray(semanticResult.embedding)
-                ? semanticResult.embedding.length
-                : null,
-              vector: semanticResult.embedding,
-            },
+          const semanticResult = await embedFileSemanticContent({
+            buffer: f.buffer,
+            mimeType: f.mimetype,
+            extractedContent: extractedContent,
+            originalFileName: record.originalFileName,
           });
 
-          semanticIndexed = true;
+          if (semanticResult?.embedding) {
+            await prisma.fileEmbedding.upsert({
+              where: { fileId: record.id },
+              create: {
+                fileId: record.id,
+                model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+                inputType: semanticResult.inputType,
+                embeddingKind: semanticResult.embeddingKind,
+                caption: semanticResult.caption || null,
+                labels: Array.isArray(semanticResult.labels) ? semanticResult.labels : [],
+                dimensions: Array.isArray(semanticResult.embedding) ? semanticResult.embedding.length : null,
+                vector: semanticResult.embedding,
+              },
+              update: {
+                model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+                inputType: semanticResult.inputType,
+                embeddingKind: semanticResult.embeddingKind,
+                caption: semanticResult.caption || null,
+                labels: Array.isArray(semanticResult.labels) ? semanticResult.labels : [],
+                dimensions: Array.isArray(semanticResult.embedding) ? semanticResult.embedding.length : null,
+                vector: semanticResult.embedding,
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Background indexing failed", {
+            fileId: record.id,
+            fileName: record.originalFileName,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        } finally {
+          activeUploadJobs.delete(record.id);
         }
-      } catch (error) {
-        semanticIndexError = error;
-        console.error("Semantic embedding failed", {
-          fileId: record.id,
-          fileName: record.originalFileName,
-          mimeType: record.mimeType,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      })();
 
       created.push({
         id: record.id,
@@ -389,28 +362,18 @@ const uploadFiles = async (req, res) => {
         mimeType: record.mimeType,
         createdAt: record.createdAt,
         downloadUrl: `/api/files/${record.id}/download`,
-        contentIndexed,
-        semanticIndexed,
-        caption: semanticCaption,
-        labels: semanticLabels,
-        contentIndexError: extractionError
-          ? extractionError instanceof Error
-            ? extractionError.message
-            : String(extractionError)
-          : null,
-        semanticIndexError: semanticIndexError
-          ? semanticIndexError instanceof Error
-            ? semanticIndexError.message
-            : String(semanticIndexError)
-          : null,
+        contentIndexed: false,
+        semanticIndexed: false,
+        caption: null,
+        labels: [],
+        contentIndexError: null,
+        semanticIndexError: null,
       });
     }
 
     res.status(201).json({
       message: "Files uploaded",
       files: created,
-      contentIndexed: created.some((file) => file.contentIndexed),
-      semanticIndexed: created.some((file) => file.semanticIndexed),
     });
   } catch (err) {
     console.error(err);
@@ -638,6 +601,64 @@ const permanentlyDeleteFile = async (req, res) => {
   }
 };
 
+const emptyTrash = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const files = await prisma.file.findMany({
+      where: { userId, isTrashed: true },
+    });
+
+    if (files.length === 0) {
+      return res.json({ message: "Trash is already empty" });
+    }
+
+    for (const file of files) {
+      await purgeFileAssets(file);
+    }
+
+    await prisma.file.deleteMany({
+      where: { userId, isTrashed: true },
+    });
+
+    res.json({ message: "Trash emptied successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Empty trash error" });
+  }
+};
+
+const getFileStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = await prisma.file.findUnique({
+      where: { id },
+      include: {
+        fileContent: true,
+        fileEmbedding: true,
+      },
+    });
+
+    if (!file) return res.status(404).json({ message: "File not found" });
+    if (file.userId !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+
+    const isProcessing = activeUploadJobs.get(id) === "processing";
+    res.json({
+      id,
+      processed: !isProcessing,
+      contentIndexed: !!file.fileContent,
+      semanticIndexed: !!file.fileEmbedding,
+      caption: file.fileEmbedding?.caption || null,
+      labels: file.fileEmbedding?.labels || [],
+      contentIndexError: null,
+      semanticIndexError: null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Status check error" });
+  }
+};
+
 export {
   uploadFiles,
   listFiles,
@@ -646,5 +667,7 @@ export {
   listTrashedFiles,
   restoreFile,
   permanentlyDeleteFile,
+  emptyTrash,
   streamDownload,
+  getFileStatus,
 };

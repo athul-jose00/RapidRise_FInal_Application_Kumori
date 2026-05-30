@@ -118,9 +118,9 @@ export default function SharedMainTable({
   const endIndex = Math.min(currentPage * 8, totalItems);
 
   return (
-    <div className="flex-1 flex flex-col bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-xs">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+    <div className="w-full min-w-0 flex-1 flex flex-col bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-xs">
+      <div className="overflow-x-auto w-full">
+        <table className="w-full min-w-[650px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/40">
               <th className="pl-8 pr-6 py-3 font-bold text-[#c62828] hover:bg-slate-50">Name</th>

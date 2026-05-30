@@ -215,7 +215,7 @@ export default function SharedTabPage() {
       </div>
 
       {/* Main Split Layout */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 items-start overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 lg:items-start items-stretch overflow-hidden w-full min-w-0">
         <SharedMainTable
           groupedShares={paginatedGrouped}
           selectedFileId={selectedFileId}

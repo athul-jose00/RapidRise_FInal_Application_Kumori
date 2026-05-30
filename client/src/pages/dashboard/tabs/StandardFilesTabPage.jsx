@@ -6,6 +6,8 @@ export default function StandardFilesTabPage({
   description,
   onCreateNew,
   fileListProps,
+  showNewButton = true,
+  rightActions = null,
 }) {
   return (
     <>
@@ -16,20 +18,25 @@ export default function StandardFilesTabPage({
           </h1>
           <p className="text-sm text-slate-500 mt-1">{description}</p>
         </div>
-        <div className="flex items-center bg-[#c62828] hover:bg-[#b71c1c] text-white rounded-xl shadow-xs transition-all duration-200">
-          <button
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-none bg-transparent text-white cursor-pointer outline-none"
-            onClick={onCreateNew}
-          >
-            <span className="text-lg font-light">+</span> New
-          </button>
-          <div className="w-[1px] h-5 bg-white/20 shrink-0" />
-          <button
-            className="px-3 py-2 flex items-center justify-center border-none bg-transparent text-white cursor-pointer outline-none"
-            onClick={onCreateNew}
-          >
-            <ChevronDown size={14} />
-          </button>
+        <div className="flex items-center gap-3">
+          {showNewButton && (
+            <div className="flex items-center bg-[#c62828] hover:bg-[#b71c1c] text-white rounded-xl shadow-xs transition-all duration-200">
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-none bg-transparent text-white cursor-pointer outline-none"
+                onClick={onCreateNew}
+              >
+                <span className="text-lg font-light">+</span> New
+              </button>
+              <div className="w-[1px] h-5 bg-white/20 shrink-0" />
+              <button
+                className="px-3 py-2 flex items-center justify-center border-none bg-transparent text-white cursor-pointer outline-none"
+                onClick={onCreateNew}
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
+          )}
+          {rightActions}
         </div>
       </div>
 

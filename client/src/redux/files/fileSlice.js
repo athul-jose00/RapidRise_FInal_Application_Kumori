@@ -84,6 +84,19 @@ export const permanentlyDeleteFile = createAsyncThunk(
   },
 );
 
+export const emptyTrash = createAsyncThunk(
+  "files/emptyTrash",
+  async (_, thunkAPI) => {
+    try {
+      const res = await api.delete(`/api/files/trash/empty`);
+      return res.data;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  },
+);
+
 export const restoreFile = createAsyncThunk(
   "files/restoreFile",
   async (id, thunkAPI) => {
@@ -189,6 +202,20 @@ const fileSlice = createSlice({
         );
       })
       .addCase(permanentlyDeleteFile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
+    builder
+      .addCase(emptyTrash.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(emptyTrash.fulfilled, (state) => {
+        state.loading = false;
+        state.trashItems = [];
+      })
+      .addCase(emptyTrash.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || action.error.message;
       });

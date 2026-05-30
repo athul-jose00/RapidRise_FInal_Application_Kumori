@@ -46,27 +46,39 @@ export default function FilePreview({
   const { accessToken } = useSelector((state) => state.user);
   const [containerWidth, setContainerWidth] = useState(null);
   const [isPdfLoading, setIsPdfLoading] = useState(true);
-  const containerRef = useRef(null);
+  const observerRef = useRef(null);
+
+  const containerRef = (node) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        if (entries[0]) {
+          const width = entries[0].contentRect.width;
+          setContainerWidth(Math.max(200, width - 32));
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setIsPdfLoading(true);
     setActivePage(1);
     setNumPages(null);
   }, [file?.id]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      if (entries[0]) {
-        // contentRect width does not include padding or scrollbars
-        const width = entries[0].contentRect.width;
-        // Subtract horizontal padding (p-4 is 16px on each side, total 32px)
-        setContainerWidth(Math.max(200, width - 32));
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
 
   const getSafeFileName = () =>
     file?.originalFileName || file?.fileName || "Untitled";
@@ -343,7 +355,7 @@ export default function FilePreview({
                   {/* Main PDF Page Display Canvas */}
                   <div 
                     ref={containerRef}
-                    className="flex-1 overflow-auto p-4 flex items-start justify-center max-h-[calc(100vh-210px)] w-full"
+                    className="flex-1 overflow-auto p-4 flex items-start justify-center max-h-[calc(100vh-210px)] w-full min-w-0"
                   >
                     <Page
                       pageNumber={activePage}

@@ -19,6 +19,7 @@ import {
   clearUploads,
   selectUploads,
 } from "../../redux/uploads/uploadsSlice";
+import { fetchFiles } from "../../redux/files/fileSlice";
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024;
 
@@ -179,8 +180,47 @@ export default function UploadPage({ formatBytes, files = [] }) {
         .then((res) => {
           // remove cancel ref
           delete cancelRefs.current[uploadId];
-          dispatch(removeUpload(uploadId));
-          toast.success(`${file.name} uploaded successfully!`);
+
+          const uploadedFiles = res.data?.files || [];
+          const uploadedFile = uploadedFiles[0];
+
+          if (!uploadedFile?.id) {
+            dispatch(removeUpload(uploadId));
+            toast.success(`${file.name} uploaded successfully!`);
+            dispatch(fetchFiles());
+            return;
+          }
+
+          // Update state to "AI indexing..."
+          dispatch(
+            updateUpload({
+              id: uploadId,
+              loaded: file.size,
+              progress: 100,
+              timeLeft: "AI indexing...",
+            })
+          );
+
+          // Start polling the server status endpoint
+          let pollCount = 0;
+          const maxPolls = 15; // 30 seconds max (15 * 2s)
+          const intervalId = setInterval(async () => {
+            try {
+              pollCount++;
+              const statusRes = await api.get(`/api/files/${uploadedFile.id}/status`);
+              if (statusRes.data?.processed || pollCount >= maxPolls) {
+                clearInterval(intervalId);
+                dispatch(removeUpload(uploadId));
+                toast.success(`${file.name} uploaded successfully!`);
+                dispatch(fetchFiles());
+              }
+            } catch (pollErr) {
+              clearInterval(intervalId);
+              dispatch(removeUpload(uploadId));
+              toast.success(`${file.name} uploaded successfully!`);
+              dispatch(fetchFiles());
+            }
+          }, 2000);
         })
         .catch((err) => {
           if (axios.isCancel(err)) {
