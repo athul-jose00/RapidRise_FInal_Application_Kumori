@@ -113,6 +113,104 @@ const normalizeUploadError = (err) => {
   return { status: 500, message: "Upload error" };
 };
 
+const indexUploadedFile = async ({ record, buffer, mimeType, originalFileName }) => {
+  activeUploadJobs.set(record.id, "processing");
+
+  try {
+    const extracted = await extractFileContent(buffer, mimeType);
+    const extractedContent = extracted?.content || "";
+    const searchIndex = extractedContent.trim().toLowerCase();
+    const hasExtractableText = extractedContent.trim().length > 0;
+
+    let contentIndexed = false;
+    let semanticIndexed = false;
+    let caption = null;
+    let labels = [];
+
+    if (hasExtractableText) {
+      await prisma.fileContent.create({
+        data: {
+          fileId: record.id,
+          content: extractedContent,
+          searchIndex,
+          wordCount: extracted?.metadata?.wordCount ?? null,
+          pageCount: extracted?.metadata?.pageCount ?? null,
+          ocrConfidence: extracted?.metadata?.ocrConfidence ?? null,
+          language: extracted?.metadata?.language ?? null,
+        },
+      });
+
+      contentIndexed = true;
+    }
+
+    const semanticResult = await embedFileSemanticContent({
+      buffer,
+      mimeType,
+      extractedContent,
+      originalFileName: record.originalFileName,
+    });
+
+    if (semanticResult?.embedding) {
+      await prisma.fileEmbedding.upsert({
+        where: { fileId: record.id },
+        create: {
+          fileId: record.id,
+          model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+          inputType: semanticResult.inputType,
+          embeddingKind: semanticResult.embeddingKind,
+          caption: semanticResult.caption || null,
+          labels: Array.isArray(semanticResult.labels)
+            ? semanticResult.labels
+            : [],
+          dimensions: Array.isArray(semanticResult.embedding)
+            ? semanticResult.embedding.length
+            : null,
+          vector: semanticResult.embedding,
+        },
+        update: {
+          model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
+          inputType: semanticResult.inputType,
+          embeddingKind: semanticResult.embeddingKind,
+          caption: semanticResult.caption || null,
+          labels: Array.isArray(semanticResult.labels)
+            ? semanticResult.labels
+            : [],
+          dimensions: Array.isArray(semanticResult.embedding)
+            ? semanticResult.embedding.length
+            : null,
+          vector: semanticResult.embedding,
+        },
+      });
+
+      semanticIndexed = true;
+      caption = semanticResult.caption || null;
+      labels = Array.isArray(semanticResult.labels) ? semanticResult.labels : [];
+    }
+
+    return {
+      contentIndexed,
+      semanticIndexed,
+      caption,
+      labels,
+    };
+  } catch (error) {
+    console.error("Background indexing failed", {
+      fileId: record.id,
+      fileName: record.originalFileName,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      contentIndexed: false,
+      semanticIndexed: false,
+      caption: null,
+      labels: [],
+    };
+  } finally {
+    activeUploadJobs.delete(record.id);
+  }
+};
+
 const isPrematureCloseError = (err) =>
   err?.code === "ERR_STREAM_PREMATURE_CLOSE" ||
   err?.code === "ECONNRESET" ||
@@ -285,80 +383,20 @@ const uploadFiles = async (req, res) => {
 
       const record = await prisma.file.create({ data: recordData });
 
-      // Track this file as active upload processing job
-      activeUploadJobs.set(record.id, "processing");
-
-      // Run extraction and embedding asynchronously in the background
-      (async () => {
-        try {
-          const extracted = await extractFileContent(f.buffer, f.mimetype);
-          const extractedContent = extracted?.content || "";
-          const searchIndex = extractedContent.trim().toLowerCase();
-          const hasExtractableText = extractedContent.trim().length > 0;
-
-          if (hasExtractableText) {
-            await prisma.fileContent.create({
-              data: {
-                fileId: record.id,
-                content: extractedContent,
-                searchIndex,
-                wordCount: extracted?.metadata?.wordCount ?? null,
-                pageCount: extracted?.metadata?.pageCount ?? null,
-                ocrConfidence: extracted?.metadata?.ocrConfidence ?? null,
-                language: extracted?.metadata?.language ?? null,
-              },
-            });
-          }
-
-          const semanticResult = await embedFileSemanticContent({
-            buffer: f.buffer,
-            mimeType: f.mimetype,
-            extractedContent: extractedContent,
-            originalFileName: record.originalFileName,
+      const indexingPromise = indexUploadedFile({
+        record,
+        buffer: f.buffer,
+        mimeType: f.mimetype,
+        originalFileName: f.originalname,
+      });
+      const indexingResult = hosted
+        ? await indexingPromise
+        : (void indexingPromise, {
+            contentIndexed: false,
+            semanticIndexed: false,
+            caption: null,
+            labels: [],
           });
-
-          if (semanticResult?.embedding) {
-            await prisma.fileEmbedding.upsert({
-              where: { fileId: record.id },
-              create: {
-                fileId: record.id,
-                model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
-                inputType: semanticResult.inputType,
-                embeddingKind: semanticResult.embeddingKind,
-                caption: semanticResult.caption || null,
-                labels: Array.isArray(semanticResult.labels)
-                  ? semanticResult.labels
-                  : [],
-                dimensions: Array.isArray(semanticResult.embedding)
-                  ? semanticResult.embedding.length
-                  : null,
-                vector: semanticResult.embedding,
-              },
-              update: {
-                model: process.env.COHERE_EMBED_MODEL || "embed-v4.0",
-                inputType: semanticResult.inputType,
-                embeddingKind: semanticResult.embeddingKind,
-                caption: semanticResult.caption || null,
-                labels: Array.isArray(semanticResult.labels)
-                  ? semanticResult.labels
-                  : [],
-                dimensions: Array.isArray(semanticResult.embedding)
-                  ? semanticResult.embedding.length
-                  : null,
-                vector: semanticResult.embedding,
-              },
-            });
-          }
-        } catch (error) {
-          console.error("Background indexing failed", {
-            fileId: record.id,
-            fileName: record.originalFileName,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        } finally {
-          activeUploadJobs.delete(record.id);
-        }
-      })();
 
       created.push({
         id: record.id,
@@ -367,10 +405,10 @@ const uploadFiles = async (req, res) => {
         mimeType: record.mimeType,
         createdAt: record.createdAt,
         downloadUrl: `/api/files/${record.id}/download`,
-        contentIndexed: false,
-        semanticIndexed: false,
-        caption: null,
-        labels: [],
+        contentIndexed: indexingResult.contentIndexed,
+        semanticIndexed: indexingResult.semanticIndexed,
+        caption: indexingResult.caption,
+        labels: indexingResult.labels,
         contentIndexError: null,
         semanticIndexError: null,
       });
