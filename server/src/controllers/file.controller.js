@@ -113,7 +113,12 @@ const normalizeUploadError = (err) => {
   return { status: 500, message: "Upload error" };
 };
 
-const indexUploadedFile = async ({ record, buffer, mimeType, originalFileName }) => {
+const indexUploadedFile = async ({
+  record,
+  buffer,
+  mimeType,
+  originalFileName,
+}) => {
   activeUploadJobs.set(record.id, "processing");
 
   try {
@@ -184,7 +189,9 @@ const indexUploadedFile = async ({ record, buffer, mimeType, originalFileName })
 
       semanticIndexed = true;
       caption = semanticResult.caption || null;
-      labels = Array.isArray(semanticResult.labels) ? semanticResult.labels : [];
+      labels = Array.isArray(semanticResult.labels)
+        ? semanticResult.labels
+        : [];
     }
 
     return {
@@ -391,7 +398,8 @@ const uploadFiles = async (req, res) => {
       });
       const indexingResult = hosted
         ? await indexingPromise
-        : (void indexingPromise, {
+        : (void indexingPromise,
+          {
             contentIndexed: false,
             semanticIndexed: false,
             caption: null,
