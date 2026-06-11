@@ -396,16 +396,27 @@ const uploadFiles = async (req, res) => {
         mimeType: f.mimetype,
         originalFileName: f.originalname,
       });
-      // Fire and forget indexing so that the upload response returns immediately,
-      // avoiding Vercel serverless function timeouts (500 errors).
-      void indexingPromise;
 
-      const indexingResult = {
+      // Await indexing on Vercel to guarantee database write before response.
+      // Since Tesseract OCR is bypassed on hosted environments, this runs very fast (< 2s).
+      // On local environments, run asynchronously to respond immediately.
+      let indexingResult = {
         contentIndexed: false,
         semanticIndexed: false,
         caption: null,
         labels: [],
       };
+
+      if (hosted) {
+        try {
+          const res = await indexingPromise;
+          indexingResult = res;
+        } catch (err) {
+          console.error("Synchronous indexing failed:", err);
+        }
+      } else {
+        void indexingPromise;
+      }
 
       created.push({
         id: record.id,

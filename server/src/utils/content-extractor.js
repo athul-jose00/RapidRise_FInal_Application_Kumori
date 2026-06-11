@@ -85,6 +85,12 @@ export const extractImageContent = async (buffer) => {
     return buildEmptyResult("image");
   }
 
+  // Skip Tesseract OCR in hosted/serverless environments because it creates worker threads 
+  // that hang or timeout on Vercel, and we already generate descriptions/labels via Vision APIs.
+  if (process.env.HOSTED === "true" || process.env.VERCEL) {
+    return buildEmptyResult("image", { ocrSkipped: true });
+  }
+
   const worker = await createWorker("eng");
 
   try {
