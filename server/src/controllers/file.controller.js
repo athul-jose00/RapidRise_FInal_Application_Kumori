@@ -396,15 +396,16 @@ const uploadFiles = async (req, res) => {
         mimeType: f.mimetype,
         originalFileName: f.originalname,
       });
-      const indexingResult = hosted
-        ? await indexingPromise
-        : (void indexingPromise,
-          {
-            contentIndexed: false,
-            semanticIndexed: false,
-            caption: null,
-            labels: [],
-          });
+      // Fire and forget indexing so that the upload response returns immediately,
+      // avoiding Vercel serverless function timeouts (500 errors).
+      void indexingPromise;
+
+      const indexingResult = {
+        contentIndexed: false,
+        semanticIndexed: false,
+        caption: null,
+        labels: [],
+      };
 
       created.push({
         id: record.id,
