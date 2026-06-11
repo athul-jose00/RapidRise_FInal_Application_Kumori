@@ -30,9 +30,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     exposedHeaders: ["Content-Disposition"],
   }),
 );
+app.options("*", cors());
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use(limiter);
