@@ -13,6 +13,8 @@ import { embedFileSemanticContent } from "../utils/semantic-indexer.js";
 const MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024; // 1 GB
 const activeUploadJobs = new Map(); // fileId -> 'processing'
 
+const getLocalUploadsRoot = () => path.join(process.cwd(), "uploads");
+
 const getDownloadFormat = (file) => {
   const extension = path
     .extname(file.originalFileName || "")
@@ -122,12 +124,7 @@ const streamDownload = async (res, file, inline = false) => {
   const disposition = inline ? "inline" : "attachment";
   // If file stored locally
   if (file.storageBackend === "local" && file.storedFileName) {
-    const fullPath = path.join(
-      process.cwd(),
-      "server",
-      "uploads",
-      file.storedFileName,
-    );
+    const fullPath = path.join(getLocalUploadsRoot(), file.storedFileName);
     if (!fs.existsSync(fullPath)) throw new Error("Local file not found");
 
     const readStream = fs.createReadStream(fullPath);
@@ -566,12 +563,7 @@ const purgeFileAssets = async (file) => {
     }
   } else if (file.storageBackend === "local" && file.storedFileName) {
     try {
-      const fullPath = path.join(
-        process.cwd(),
-        "server",
-        "uploads",
-        file.storedFileName,
-      );
+      const fullPath = path.join(getLocalUploadsRoot(), file.storedFileName);
       await fsp.unlink(fullPath).catch(() => {});
     } catch (e) {
       console.error("local delete error", e);

@@ -446,7 +446,7 @@ export default function SearchResults({
                     .map((img) => {
                       const url = img?.cloudinaryUrl?.startsWith("http")
                         ? img.cloudinaryUrl
-                        : `${API_ROOT}/api/files/${img.id}/download?token=${accessToken}`;
+                        : `${API_ROOT}/api/files/${img.id}/download?inline=true${accessToken ? `&token=${encodeURIComponent(accessToken)}` : ""}`;
                       return (
                         <div
                           key={img.id}

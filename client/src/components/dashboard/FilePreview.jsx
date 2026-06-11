@@ -142,7 +142,7 @@ export default function FilePreview({
   const mimeGroup = getFileMimeGroup();
   const imageUrl = file?.cloudinaryUrl?.startsWith("http") 
     ? file.cloudinaryUrl 
-    : `${API_ROOT}/api/files/${file?.id}/download?token=${accessToken}`;
+    : `${API_ROOT}/api/files/${file?.id}/download?inline=true${accessToken ? `&token=${encodeURIComponent(accessToken)}` : ""}`;
 
   // Dynamically partition document text to enable page turning
   const getPagesArray = () => {
@@ -304,7 +304,7 @@ export default function FilePreview({
                   </div>
                 )}
                 <Document
-                  file={`${API_ROOT}/api/files/${file?.id}/download?token=${accessToken}`}
+                  file={`${API_ROOT}/api/files/${file?.id}/download?inline=true${accessToken ? `&token=${encodeURIComponent(accessToken)}` : ""}`}
                   onLoadSuccess={({ numPages }) => {
                     setNumPages(numPages);
                     setIsPdfLoading(false);
