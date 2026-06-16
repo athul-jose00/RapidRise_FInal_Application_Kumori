@@ -271,8 +271,16 @@ export default function useDashboardController() {
         const downloadUrl = `${api.defaults.baseURL || "http://localhost:3000"}/api/files/${file.id}/download${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`;
         
         // Use an iframe to avoid browser location change collision/cancellations
+        // Ensure downloads are allowed when possible by setting sandbox flags.
         const iframe = document.createElement("iframe");
         iframe.style.display = "none";
+        // Add sandbox attributes to explicitly allow downloads in browsers
+        // that require the 'allow-downloads' flag on sandboxed frames.
+        try {
+          iframe.sandbox = "allow-scripts allow-same-origin allow-downloads";
+        } catch (e) {
+          // ignore if browser doesn't support setting sandbox via property
+        }
         iframe.src = downloadUrl;
         document.body.appendChild(iframe);
         

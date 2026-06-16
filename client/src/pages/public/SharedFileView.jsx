@@ -205,18 +205,49 @@ export default function SharedFileView({ token }) {
     );
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!token) return;
     const toastId = toast.info("Preparing download...");
+    const downloadUrl = `${API_ROOT}/public/share/${token}/download`;
     try {
-      const downloadUrl = `${API_ROOT}/public/share/${token}/download`;
-      window.location.assign(downloadUrl);
+      // If this frame is top-level, navigate directly. Otherwise try opening new tab.
+      if (window.top === window.self) {
+        window.location.assign(downloadUrl);
+      } else {
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
       toast.dismiss(toastId);
       toast.success("Download started!");
+      return;
     } catch (err) {
-      console.error("Download failed:", err);
+      console.warn("Direct download/navigation blocked, falling back to blob fetch:", err);
+    }
+
+    // Fallback: fetch the file as a blob and trigger a download via an anchor
+    try {
+      const res = await axios.get(downloadUrl, { responseType: "blob" });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = getSafeFileName();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
       toast.dismiss(toastId);
-      toast.error("Download failed. Please try again.");
+      toast.success("Download started!");
+      return;
+    } catch (err) {
+      console.error("Blob download fallback failed:", err);
+      toast.dismiss(toastId);
+      toast.error("Download failed. You can open the file directly: " + downloadUrl);
     }
   };
 

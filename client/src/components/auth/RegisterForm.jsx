@@ -52,6 +52,19 @@ export default function RegisterForm({ onToggle, onNavigate, isVisible }) {
       return;
     }
 
+    const dob = new Date(registerData.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+
+    if (age < 16) {
+      setError("You must be at least 16 years old to register.");
+      return;
+    }
+
     if (registerData.password !== registerData.confirmPassword) {
       setError("Passwords do not match");
       return;

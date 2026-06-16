@@ -1,8 +1,12 @@
 import { getDocumentProxy, extractText } from "unpdf";
 import { createWorker } from "tesseract.js";
+import mammoth from "mammoth";
 
 const TEXT_MIME_PREFIX = "text/";
 const PDF_MIME_TYPES = new Set(["application/pdf"]);
+const WORD_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 const safeBufferToUtf8 = (buffer) => {
   if (!buffer || buffer.length === 0) return "";
@@ -116,6 +120,29 @@ export const extractImageContent = async (buffer) => {
 };
 
 /**
+ * Extract text from a Word document buffer (.docx) using mammoth.
+ */
+export const extractWordContent = async (buffer) => {
+  if (!buffer || buffer.length === 0) {
+    return buildEmptyResult("word");
+  }
+
+  const result = await mammoth.extractRawText({ buffer });
+  const content = (result.value || "").trim();
+
+  return {
+    content,
+    metadata: {
+      sourceType: "word",
+      extracted: true,
+      empty: content.length === 0,
+      wordCount: content ? content.split(/\s+/).filter(Boolean).length : 0,
+      warnings: result.messages || [],
+    },
+  };
+};
+
+/**
  * Route the buffer to the correct extractor based on MIME type.
  * Always returns a safe object and never throws for extraction failures.
  */
@@ -139,6 +166,10 @@ export const extractFileContent = async (buffer, mimeType) => {
       return await extractImageContent(buffer);
     }
 
+    if (WORD_MIME_TYPES.has(normalizedMimeType)) {
+      return await extractWordContent(buffer);
+    }
+
     return buildErrorResult(
       "unknown",
       new Error(`Unsupported MIME type: ${mimeType || "unknown"}`),
@@ -150,9 +181,11 @@ export const extractFileContent = async (buffer, mimeType) => {
         ? "image"
         : normalizedMimeType === "application/pdf"
           ? "pdf"
-          : normalizedMimeType.startsWith(TEXT_MIME_PREFIX)
-            ? "text"
-            : "unknown",
+          : WORD_MIME_TYPES.has(normalizedMimeType)
+            ? "word"
+            : normalizedMimeType.startsWith(TEXT_MIME_PREFIX)
+              ? "text"
+              : "unknown",
       error,
       { mimeType: normalizedMimeType },
     );
@@ -202,5 +235,6 @@ export default {
   extractPdfContent,
   extractTextContent,
   extractImageContent,
+  extractWordContent,
   searchContent,
 };
